@@ -1,4 +1,17 @@
-import type { Question, ReviewData } from '@/types'
+import type { Award, Question, ReviewData } from '@/types'
+
+/**
+ * Candidate honours for the Award of the Year. One is picked per review so no
+ * two cards feel identical; generation will eventually choose from the answers.
+ */
+export const AWARD_POOL: Award[] = [
+  { emoji: '🏆', title: 'Most Likely To Steal Food Without Regret' },
+  { emoji: '🥇', title: 'Lifetime Achievement In Being Annoying' },
+  { emoji: '🎭', title: 'Best Performance In Starting Fights' },
+  { emoji: '🚨', title: 'Most Wanted For Food Theft' },
+  { emoji: '👑', title: 'Employee Of The Family' },
+  { emoji: '🫶', title: 'Best Supporting Human' },
+]
 
 export const QUESTIONS: Question[] = [
   {
@@ -55,6 +68,10 @@ export const SAMPLE_REVIEW: ReviewData = {
   managerReview:
     'Despite repeatedly testing my patience, the employee has demonstrated exceptional performance as a sibling. Shows up without being asked. Remembers what I forget.',
   reviewedBy: 'The Management (me)',
+  award: {
+    emoji: '🏆',
+    title: 'Most Likely To Steal Food Without Regret',
+  },
   finalDecision: 'RETAINED',
   decisionEmoji: '❤️',
   decisionReason: 'Unfortunately, irreplaceable.',

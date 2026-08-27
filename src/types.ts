@@ -21,6 +21,12 @@ export interface PerformanceMetric {
   tone: 'roast' | 'love'
 }
 
+export interface Award {
+  emoji: string
+  /** The award's name, e.g. "Most Likely To Steal Food Without Regret" */
+  title: string
+}
+
 export interface ReviewData {
   /** Document identifier printed on the report, e.g. "RB-2026-0007" */
   documentId: string
@@ -40,6 +46,8 @@ export interface ReviewData {
   managerReview: string
   /** Name signed under the manager's review */
   reviewedBy: string
+  /** A personalised, stamped-certificate style honour, shown before the verdict */
+  award: Award
   /** The climax stamp text, e.g. "RETAINED" */
   finalDecision: string
   /** Emoji beside the decision, e.g. "❤️" */

@@ -9,12 +9,13 @@ interface DecisionStampProps {
 
 /**
  * The climax of the review: an oversized rubber-stamp treatment of the final
- * verdict, built to be the thing people screenshot.
+ * verdict, sized in container units so it scales with the poster and never
+ * overflows. Deliberately a touch off-axis so it reads as stamped by hand.
  */
 export function DecisionStamp({
   decision,
   emoji,
-  rotate = -4,
+  rotate = -3.5,
   className = '',
 }: DecisionStampProps) {
   return (
@@ -22,28 +23,27 @@ export function DecisionStamp({
       {/* heat behind the stamp */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -inset-x-6 rounded-full opacity-55 blur-2xl"
+        className="pointer-events-none absolute inset-0 -inset-x-[4cqw] rounded-full opacity-55 blur-[4cqw]"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(255,61,129,0.42), rgba(255,107,94,0.18) 55%, transparent 75%)',
+            'radial-gradient(ellipse at center, rgba(255,61,129,0.5), rgba(255,107,94,0.2) 55%, transparent 75%)',
         }}
       />
 
       <div
-        className="relative rounded-xl border-[3px] border-hotpink px-[4.5cqw] py-[2.5cqw]"
+        className="relative rounded-[1.2cqw] border-[0.65cqw] border-hotpink px-[4cqw] py-[1.4cqw]"
         style={{
           transform: `rotate(${rotate}deg)`,
           boxShadow:
-            'inset 0 0 0 2px rgba(11,10,19,0.9), inset 0 0 0 4px rgba(255,61,129,0.85), 0 10px 24px -14px rgba(255,61,129,0.6)',
+            'inset 0 0 0 0.5cqw rgba(11,10,19,0.9), inset 0 0 0 1cqw rgba(255,61,129,0.85), 0 1.5cqw 3cqw -1.5cqw rgba(255,61,129,0.65)',
         }}
       >
-        {/* sized against the card, not the viewport, so the stamp always fits */}
-        <div className="flex items-center gap-[2cqw]">
-          <span className="font-display text-[clamp(26px,10.5cqw,48px)] font-extrabold uppercase leading-none tracking-[0.02em] text-hotpink">
+        <div className="flex items-center gap-[1.5cqw]">
+          <span className="font-display text-[8.2cqw] font-extrabold uppercase leading-none tracking-[0.01em] text-hotpink">
             {decision}
           </span>
           {emoji && (
-            <span className="text-[clamp(21px,8.5cqw,38px)] leading-none" aria-hidden>
+            <span className="text-[6.5cqw] leading-none" aria-hidden>
               {emoji}
             </span>
           )}
