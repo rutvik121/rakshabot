@@ -69,7 +69,9 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
             aria-hidden
             className="pointer-events-none absolute -top-6 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-purple/25 blur-3xl"
           />
-          <div className="relative origin-top rotate-[-2deg] transition-transform duration-500 hover:rotate-0">
+          {/* the card is an inline-size container, so its wrapper needs a
+              definite width — it can no longer size from the card's contents */}
+          <div className="relative w-full max-w-[400px] origin-top rotate-[-2deg] transition-transform duration-500 hover:rotate-0">
             <ReviewCard review={SAMPLE_REVIEW} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 rounded-b-[20px] bg-gradient-to-t from-ink via-ink/75 to-transparent" />
           </div>
