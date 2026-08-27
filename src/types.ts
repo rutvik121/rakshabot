@@ -8,6 +8,16 @@ export interface Question {
 
 export type Answers = Record<string, string>
 
+/** Who is being reviewed. Collected before the questions. */
+export interface SiblingIdentity {
+  name: string
+  /** Object URL for a photo the user picked; the card falls back to an emoji */
+  photoUrl?: string
+}
+
+/** Longest sibling name the poster can set without overflowing its fixed frame. */
+export const MAX_NAME_LENGTH = 22
+
 export interface PerformanceMetric {
   /** Short, punchy metric name, e.g. "Annoying Me" */
   label: string

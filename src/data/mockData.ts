@@ -1,4 +1,4 @@
-import type { Award, Question, ReviewData } from '@/types'
+import type { Award, Question, ReviewData, SiblingIdentity } from '@/types'
 
 /**
  * Candidate honours for the Award of the Year. One is picked per review so no
@@ -76,4 +76,25 @@ export const SAMPLE_REVIEW: ReviewData = {
   decisionEmoji: '❤️',
   decisionReason: 'Unfortunately, irreplaceable.',
   hashtag: '#SiblingPerformanceReview',
+}
+
+/**
+ * Builds the review shown to the user.
+ *
+ * The prose is still mock — generation comes later — but the sibling's own name
+ * and photo are real, so the poster is about *them*. Each review also draws a
+ * different award and document id so no two cards look alike.
+ */
+export function buildReview(identity: SiblingIdentity): ReviewData {
+  const name = identity.name.trim()
+  const award = AWARD_POOL[Math.floor(Math.random() * AWARD_POOL.length)]
+  const serial = String(Math.floor(Math.random() * 9000) + 1000)
+
+  return {
+    ...SAMPLE_REVIEW,
+    employeeName: name || SAMPLE_REVIEW.employeeName,
+    photoUrl: identity.photoUrl,
+    documentId: `RB-2026-${serial}`,
+    award,
+  }
 }

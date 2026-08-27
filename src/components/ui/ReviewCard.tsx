@@ -32,6 +32,13 @@ function SectionRule({ label }: { label: string }) {
  * 1080px export.
  */
 export function ReviewCard({ review, className = '' }: ReviewCardProps) {
+  /*
+   * The poster is a fixed frame, so the name must never wrap — a second line
+   * would push everything below it out of the card. Scaling the type down as
+   * the name gets longer keeps it on one line at any length the input allows.
+   */
+  const nameSize = Math.min(4.2, 46 / Math.max(review.employeeName.length, 1))
+
   return (
     <article
       className={`bg-grain @container relative isolate aspect-[1080/1350] w-full max-w-[400px] overflow-hidden rounded-[3cqw] border border-cream/12 bg-ink-soft shadow-card ${className}`}
@@ -90,9 +97,12 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
             <span className="mt-[1.8cqw] font-mono text-[1.6cqw] uppercase tracking-[0.2em] text-cream/40">
               Employee
             </span>
-            <h2 className="mt-[0.4cqw] font-display text-[4.2cqw] font-extrabold uppercase leading-[0.95] tracking-[-0.02em] text-cream">
+            <h2
+              className="mt-[0.4cqw] whitespace-nowrap font-display font-extrabold uppercase leading-[0.95] tracking-[-0.02em] text-cream"
+              style={{ fontSize: `${nameSize}cqw` }}
+            >
               {review.employeeName}{' '}
-              <span className="align-middle text-[3.3cqw]" aria-hidden>
+              <span className="align-middle" style={{ fontSize: `${nameSize * 0.79}cqw` }} aria-hidden>
                 {review.employeeEmoji}
               </span>
             </h2>
