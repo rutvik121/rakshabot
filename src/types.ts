@@ -9,20 +9,42 @@ export interface Question {
 export type Answers = Record<string, string>
 
 export interface PerformanceMetric {
+  /** Short, punchy metric name, e.g. "Annoying Me" */
   label: string
+  /** 0–100 */
   score: number
   emoji: string
+  /**
+   * Emotional valence, which drives the meter's colour. Ordering roast metrics
+   * before love metrics makes the card warm from orange to pink as it's read.
+   */
+  tone: 'roast' | 'love'
 }
 
 export interface ReviewData {
-  employeeName: string
-  avatarEmoji: string
-  position: string
+  /** Document identifier printed on the report, e.g. "RB-2026-0007" */
+  documentId: string
+  /** e.g. "FY 2025–26" */
   reviewPeriod: string
-  employeeId: string
+  /** How the employee is named on the report, e.g. "MY SISTER" */
+  employeeName: string
+  /** Emoji trailing the name, e.g. "😤" */
+  employeeEmoji: string
+  /** Emoji used as the polaroid photo placeholder */
+  photoEmoji: string
+  /** Optional real photo; falls back to photoEmoji when absent */
+  photoUrl?: string
+  /** Two-line job title, e.g. ["Full-Time Annoyance", "Part-Time Best Friend"] */
+  position: [string, string]
   metrics: PerformanceMetric[]
   managerReview: string
-  strengths: string[]
+  /** Name signed under the manager's review */
+  reviewedBy: string
+  /** The climax stamp text, e.g. "RETAINED" */
   finalDecision: string
+  /** Emoji beside the decision, e.g. "❤️" */
+  decisionEmoji: string
+  /** e.g. "Unfortunately, irreplaceable." */
   decisionReason: string
+  hashtag: string
 }

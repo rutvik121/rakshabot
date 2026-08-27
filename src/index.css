@@ -4,6 +4,7 @@
   --font-display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
 
   /* surfaces */
   --color-ink: #0b0a13;

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { ShareCard } from '@/components/ui/ShareCard'
+import { ReviewCard } from '@/components/ui/ReviewCard'
 import { HeartDoodle, StarDoodle } from '@/components/decorative/Doodles'
 import { SAMPLE_REVIEW } from '@/data/mockData'
 
@@ -69,9 +69,9 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
             aria-hidden
             className="pointer-events-none absolute -top-6 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-purple/25 blur-3xl"
           />
-          <div className="relative w-full max-w-xs origin-top scale-95 rotate-[-2deg] transition-transform duration-500 hover:rotate-0 sm:max-w-sm">
-            <ShareCard review={SAMPLE_REVIEW} />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 rounded-b-[28px] bg-gradient-to-t from-ink via-ink/70 to-transparent" />
+          <div className="relative origin-top rotate-[-2deg] transition-transform duration-500 hover:rotate-0">
+            <ReviewCard review={SAMPLE_REVIEW} />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 rounded-b-[20px] bg-gradient-to-t from-ink via-ink/75 to-transparent" />
           </div>
           <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-ink-line bg-ink-soft px-4 py-1.5 font-mono text-[11px] text-cream/50">
             preview · yours will look sharper

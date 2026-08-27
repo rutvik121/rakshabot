@@ -39,25 +39,24 @@ export const QUESTIONS: Question[] = [
 ]
 
 export const SAMPLE_REVIEW: ReviewData = {
-  employeeName: 'Ananya "Chaos Goblin" Sharma',
-  avatarEmoji: '👑',
-  position: 'Senior Sibling & Chief Snack Officer',
+  documentId: 'RB-2026-0007',
   reviewPeriod: 'FY 2025–26',
-  employeeId: 'SIB-0007',
+  employeeName: 'My Sister',
+  employeeEmoji: '😤',
+  photoEmoji: '👧',
+  position: ['Full-Time Annoyance', 'Part-Time Best Friend'],
   metrics: [
-    { label: 'Reply Speed', score: 22, emoji: '📵' },
-    { label: 'Emotional Damage Caused', score: 91, emoji: '💥' },
-    { label: 'Snack Theft Rate', score: 87, emoji: '🍫' },
-    { label: 'Showing Up When It Matters', score: 98, emoji: '🫶' },
-    { label: 'Overall Vibes', score: 95, emoji: '✨' },
+    { label: 'Annoying Me', score: 100, emoji: '😡', tone: 'roast' },
+    { label: 'Stealing My Food', score: 94, emoji: '🍔', tone: 'roast' },
+    { label: 'Keeping Secrets', score: 72, emoji: '🔒', tone: 'roast' },
+    { label: 'Being Supportive', score: 98, emoji: '❤️', tone: 'love' },
+    { label: 'Making Me Laugh', score: 91, emoji: '😂', tone: 'love' },
   ],
   managerReview:
-    'Consistently unavailable during working hours, yet mysteriously present the moment there is food, drama, or a family WhatsApp group emergency. Shows exceptional leadership in stealing chargers with zero remorse. Despite chronic lateness and a personality that runs entirely on sarcasm, has an unmatched ability to make everything feel okay. Promotion recommended. Reluctantly.',
-  strengths: [
-    'Turns up uninvited exactly when needed',
-    'World-class at finding the last piece of cake',
-    'Unofficial therapist, 24x7, no appointment needed',
-  ],
-  finalDecision: 'RETAINED ❤️',
+    'Despite repeatedly testing my patience, the employee has demonstrated exceptional performance as a sibling. Shows up without being asked. Remembers what I forget.',
+  reviewedBy: 'The Management (me)',
+  finalDecision: 'RETAINED',
+  decisionEmoji: '❤️',
   decisionReason: 'Unfortunately, irreplaceable.',
+  hashtag: '#SiblingPerformanceReview',
 }

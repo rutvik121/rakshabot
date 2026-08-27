@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
-import { ShareCard } from '@/components/ui/ShareCard'
+import { ReviewCard } from '@/components/ui/ReviewCard'
+import { HeartDoodle } from '@/components/decorative/Doodles'
 import type { ReviewData } from '@/types'
 
 interface ReviewResultScreenProps {
@@ -9,33 +10,52 @@ interface ReviewResultScreenProps {
 
 export function ReviewResultScreen({ review, onRestart }: ReviewResultScreenProps) {
   return (
-    <div className="relative flex min-h-svh flex-col items-center px-6 pb-16 pt-10 sm:pt-14">
+    <div className="relative flex min-h-svh flex-col items-center overflow-hidden px-5 pb-12 pt-9 sm:px-6 sm:pt-12">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-hotpink/20 blur-3xl"
+        className="pointer-events-none absolute -top-32 left-1/2 h-[460px] w-[460px] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(255,61,129,0.5), rgba(145,97,255,0.3) 50%, transparent 72%)',
+        }}
       />
 
-      <div className="relative z-10 flex flex-col items-center gap-1 text-center">
-        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-cream/40">
+      <header className="relative z-10 flex flex-col items-center gap-1.5 text-center">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-cream/45">
           Review complete
         </span>
-        <h1 className="font-display text-2xl font-extrabold text-cream sm:text-3xl">
-          Their file is ready. <span className="text-pink">Screenshot it.</span>
+        <h1 className="font-display text-[26px] font-extrabold leading-tight text-cream sm:text-[32px]">
+          The verdict is in.
         </h1>
+        <p className="max-w-xs text-sm leading-relaxed text-cream/55">
+          Send it to them. They will pretend to be offended for about four seconds.
+        </p>
+      </header>
+
+      <div className="relative z-10 mt-8 flex w-full justify-center">
+        <ReviewCard review={review} />
       </div>
 
-      <div className="relative z-10 mt-8 w-full max-w-sm">
-        <ShareCard review={review} />
+      {/* actions */}
+      <div className="relative z-10 mt-9 flex w-full max-w-[400px] flex-col gap-3">
+        <Button className="w-full">
+          Share My Review <span aria-hidden>↗</span>
+        </Button>
+        <Button variant="secondary" className="w-full">
+          Download <span aria-hidden>↓</span>
+        </Button>
+        <button
+          onClick={onRestart}
+          className="mt-1 self-center px-4 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-cream/45 transition-colors hover:text-cream"
+        >
+          Review another sibling
+        </button>
       </div>
 
-      <div className="relative z-10 mt-8 flex w-full max-w-sm flex-col items-center gap-3 sm:flex-row sm:justify-center">
-        <Button className="w-full sm:w-auto">
-          Share to Story <span aria-hidden>↗</span>
-        </Button>
-        <Button variant="secondary" onClick={onRestart} className="w-full sm:w-auto">
-          Review Another Sibling
-        </Button>
-      </div>
+      <p className="relative z-10 mt-7 flex items-center gap-1.5 text-center text-[11px] text-cream/35">
+        <HeartDoodle className="h-3 w-3 text-hotpink" />
+        Screenshot works too. We are not precious about it.
+      </p>
     </div>
   )
 }
