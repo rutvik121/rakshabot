@@ -95,6 +95,114 @@ body {
   animation: float-slow 5s ease-in-out infinite;
 }
 
+/* ── RakshaBot mascot ─────────────────────────────────────────────
+   Small, slow motions layered at different tempos so the character reads
+   as alive rather than as a spinner. */
+
+.rb-bob,
+.rb-antenna,
+.rb-heart,
+.rb-eyes,
+.rb-clipboard {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.rb-bob {
+  animation: rb-bob 4.5s ease-in-out infinite;
+}
+
+.rb-antenna {
+  transform-origin: bottom center;
+  animation: rb-sway 5.5s ease-in-out infinite;
+}
+
+.rb-heart {
+  animation: rb-beat 1.8s ease-in-out infinite;
+}
+
+/* Long hold open, quick shut — how an actual blink reads. */
+.rb-eyes {
+  animation: rb-blink 5.2s ease-in-out infinite;
+}
+
+.rb-clipboard {
+  transform-origin: top center;
+  animation: rb-write 3.2s ease-in-out infinite;
+}
+
+@keyframes rb-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes rb-sway {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes rb-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.16);
+  }
+  36% {
+    transform: scale(1);
+  }
+  54% {
+    transform: scale(1.09);
+  }
+}
+
+@keyframes rb-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  93%,
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes rb-write {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-bob,
+  .rb-antenna,
+  .rb-heart,
+  .rb-eyes,
+  .rb-clipboard,
+  .animate-float,
+  .animate-marquee,
+  .animate-pulse-dot {
+    animation: none !important;
+  }
+}
+
 @keyframes pulse-dot {
   0%,
   100% {

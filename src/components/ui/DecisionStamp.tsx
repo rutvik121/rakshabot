@@ -20,13 +20,16 @@ export function DecisionStamp({
 }: DecisionStampProps) {
   return (
     <div className={`relative flex justify-center ${className}`}>
-      {/* heat behind the stamp */}
+      {/*
+        A whisper of warmth behind the stamp, not a neon halo — the rest of the
+        poster is ink on paper, and a glowing verdict would break that language.
+      */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -inset-x-[4cqw] rounded-full opacity-55 blur-[4cqw]"
+        className="pointer-events-none absolute inset-0 -inset-x-[4cqw] rounded-full opacity-30 blur-[5cqw]"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(255,61,129,0.5), rgba(255,107,94,0.2) 55%, transparent 75%)',
+            'radial-gradient(ellipse at center, rgba(255,61,129,0.34), rgba(255,107,94,0.12) 58%, transparent 78%)',
         }}
       />
 
@@ -34,8 +37,10 @@ export function DecisionStamp({
         className="relative rounded-[1.2cqw] border-[0.65cqw] border-hotpink px-[4cqw] py-[1.4cqw]"
         style={{
           transform: `rotate(${rotate}deg)`,
+          // double rule, the way a real rubber stamp bites twice
           boxShadow:
-            'inset 0 0 0 0.5cqw rgba(11,10,19,0.9), inset 0 0 0 1cqw rgba(255,61,129,0.85), 0 1.5cqw 3cqw -1.5cqw rgba(255,61,129,0.65)',
+            'inset 0 0 0 0.5cqw rgba(11,10,19,0.92), inset 0 0 0 1cqw rgba(255,61,129,0.9)',
+          opacity: 0.96,
         }}
       >
         <div className="flex items-center gap-[1.5cqw]">

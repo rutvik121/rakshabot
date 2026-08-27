@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { RakshaBotMascot } from '@/components/decorative/RakshaBotMascot'
 import { StarDoodle } from '@/components/decorative/Doodles'
 
 interface GenerationScreenProps {
@@ -14,8 +15,8 @@ const STEPS = [
 
 const CURRENT_LABEL = 'Writing brutally honest manager feedback...'
 
-const STEP_DURATION_MS = 650
-const FINAL_HOLD_MS = 900
+const STEP_DURATION_MS = 900
+const FINAL_HOLD_MS = 1100
 
 export function GenerationScreen({ onComplete }: GenerationScreenProps) {
   const [completed, setCompleted] = useState(0)
@@ -29,28 +30,22 @@ export function GenerationScreen({ onComplete }: GenerationScreenProps) {
     return () => clearTimeout(tick)
   }, [completed, onComplete])
 
-  const progressPct = Math.min(
-    100,
-    Math.round(((completed + (completed < STEPS.length ? 0.5 : 1)) / (STEPS.length + 1)) * 100),
-  )
+  // The last stretch is the write-up itself, so the bar keeps moving after the
+  // checklist is done rather than parking at 100% and waiting.
+  const progressPct = Math.round(((completed + 0.5) / (STEPS.length + 1)) * 100)
 
   return (
     <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-16">
       <div
         aria-hidden
-        className="pointer-events-none absolute top-1/3 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple/25 blur-3xl"
+        className="pointer-events-none absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple/25 blur-3xl"
       />
 
-      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-8 text-center">
-        {/* mascot */}
+      <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-7 text-center">
         <div className="relative">
-          <div className="grid h-24 w-24 place-items-center rounded-[28px] bg-gradient-to-br from-hotpink via-coral to-orange text-5xl shadow-[0_20px_40px_-12px_rgba(255,61,129,0.55)]">
-            <span className="animate-float" aria-hidden>
-              🤖
-            </span>
-          </div>
-          <StarDoodle className="absolute -right-3 -top-3 h-5 w-5 animate-pulse-dot text-orange" />
-          <StarDoodle className="absolute -bottom-2 -left-3 h-4 w-4 animate-pulse-dot text-pink" />
+          <RakshaBotMascot className="h-36 w-36 drop-shadow-[0_12px_28px_rgba(255,61,129,0.28)]" />
+          <StarDoodle className="animate-pulse-dot absolute -right-2 top-3 h-4 w-4 text-orange" />
+          <StarDoodle className="animate-pulse-dot absolute -left-3 bottom-10 h-3 w-3 text-pink [animation-delay:-0.6s]" />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -62,33 +57,31 @@ export function GenerationScreen({ onComplete }: GenerationScreenProps) {
           </p>
         </div>
 
-        {/* progress bar */}
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-line">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-hotpink to-orange transition-[width] duration-500 ease-out"
+            className="h-full rounded-full bg-gradient-to-r from-hotpink to-orange transition-[width] duration-[900ms] ease-in-out"
             style={{ width: `${progressPct}%` }}
           />
         </div>
 
-        {/* checklist */}
         <div className="flex w-full flex-col gap-3 rounded-2xl border border-ink-line bg-ink-soft px-5 py-5 text-left">
           {STEPS.map((label, i) => {
             const done = i < completed
             return (
               <div
                 key={label}
-                className={`flex items-center gap-3 text-sm transition-opacity duration-300 ${
-                  done ? 'text-cream/80' : 'text-cream/30'
+                className={`flex items-center gap-3 text-sm transition-all duration-500 ease-out ${
+                  done ? 'translate-x-0 text-cream/80' : '-translate-x-1 text-cream/30'
                 }`}
               >
                 <span
-                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] ${
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] transition-all duration-500 ${
                     done
-                      ? 'border-hotpink bg-hotpink/20 text-pink'
-                      : 'border-ink-line text-transparent'
+                      ? 'scale-100 border-hotpink bg-hotpink/20 text-pink'
+                      : 'scale-90 border-ink-line text-transparent'
                   }`}
                 >
-                  {done ? '✓' : ''}
+                  ✓
                 </span>
                 {label}
               </div>

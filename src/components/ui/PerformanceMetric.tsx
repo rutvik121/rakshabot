@@ -2,31 +2,46 @@ import type { PerformanceMetric as PerformanceMetricType } from '@/types'
 
 const SEGMENTS = 14
 
+/*
+ * Flat ink, not gradients. A gradient fill reads as a dashboard progress bar;
+ * a single flat colour with uneven pressure reads as something stamped onto a
+ * form, which is the language the rest of the poster speaks.
+ */
 const TONES = {
-  roast: {
-    fill: 'bg-gradient-to-b from-orange to-coral',
-    score: 'text-orange',
-  },
-  love: {
-    fill: 'bg-gradient-to-b from-hotpink to-purple',
-    score: 'text-pink',
-  },
+  roast: { ink: '#ff8a3d', score: 'text-orange' },
+  love: { ink: '#ff4d92', score: 'text-pink' },
 } as const
 
 /**
- * A metric rendered as a printed report row: label with a dotted leader to the
- * score, and a run of discrete blocks beneath — closer to `██████░░░░` typed on
- * a document than to a dashboard progress bar. Roast metrics run warm orange,
- * love metrics run pink, so the block warms as the card is read.
+ * Deterministic 0–1 value from a label and index.
  *
- * Sized in container units so it scales with the poster.
+ * The cells are given a hand-stamped wobble, but a poster must render the same
+ * way every time — so the variance is hashed from the content rather than drawn
+ * from Math.random, which would reshuffle on every re-render.
+ */
+function stampJitter(seed: string, index: number): number {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  h ^= index
+  h = Math.imul(h, 16777619)
+  return ((h >>> 0) % 1000) / 1000
+}
+
+/**
+ * A metric as a row on a printed form: the label with a dotted leader to the
+ * score, and a scale of cells stamped in by hand — each one sitting at its own
+ * slight angle and ink density, on a ruled baseline. Roast metrics stamp warm
+ * orange and love metrics pink, so the sheet warms as it is read.
  */
 export function PerformanceMetric({ label, score, emoji, tone }: PerformanceMetricType) {
   const filled = Math.round((score / 100) * SEGMENTS)
   const t = TONES[tone]
 
   return (
-    <div className="flex flex-col gap-[0.45cqw]">
+    <div className="flex flex-col gap-[0.55cqw]">
       <div className="flex items-baseline gap-[1cqw] leading-none">
         <span className="shrink-0 text-[2.1cqw] leading-none" aria-hidden>
           {emoji}
@@ -45,15 +60,36 @@ export function PerformanceMetric({ label, score, emoji, tone }: PerformanceMetr
         </span>
       </div>
 
-      <div className="flex gap-[0.45cqw]" role="img" aria-label={`${label}: ${score} percent`}>
-        {Array.from({ length: SEGMENTS }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-[1.3cqw] flex-1 rounded-[0.28cqw] ${
-              i < filled ? t.fill : 'bg-cream/8 ring-1 ring-inset ring-cream/10'
-            }`}
-          />
-        ))}
+      {/* stamped scale, sitting on a printed rule */}
+      <div
+        className="flex gap-[0.7cqw] border-b border-cream/15 pb-[0.45cqw]"
+        role="img"
+        aria-label={`${label}: ${score} percent`}
+      >
+        {Array.from({ length: SEGMENTS }).map((_, i) => {
+          const isFilled = i < filled
+          const j = stampJitter(label, i)
+          return (
+            <span
+              key={i}
+              className="h-[1.5cqw] flex-1 rounded-[0.12cqw]"
+              style={
+                isFilled
+                  ? {
+                      background: t.ink,
+                      // uneven pressure, the way a ribbon or stamp actually lands
+                      opacity: 0.76 + j * 0.24,
+                      transform: `rotate(${(j - 0.5) * 5}deg) translateY(${(j - 0.5) * 0.9}px)`,
+                    }
+                  : {
+                      // an unstamped cell left blank on the form
+                      boxShadow: 'inset 0 0 0 1px rgba(255,242,223,0.16)',
+                      transform: `rotate(${(j - 0.5) * 2}deg)`,
+                    }
+              }
+            />
+          )
+        })}
       </div>
     </div>
   )
