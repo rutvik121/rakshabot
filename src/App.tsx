@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { LandingScreen } from '@/screens/LandingScreen'
 import { QuestionFlowScreen } from '@/screens/QuestionFlowScreen'
 import { GenerationScreen } from '@/screens/GenerationScreen'
@@ -35,48 +36,57 @@ function App() {
     return result
   }, [submission])
 
-  switch (stage) {
-    case 'landing':
-      return <LandingScreen onStart={() => setStage('questions')} />
+  const renderScreen = () => {
+    switch (stage) {
+      case 'landing':
+        return <LandingScreen onStart={() => setStage('questions')} />
 
-    case 'questions':
-      return (
-        <QuestionFlowScreen
-          onExit={() => setStage('landing')}
-          onComplete={(identity, answers) => {
-            setSubmission({ identity, answers })
-            setStage('generating')
-          }}
-        />
-      )
+      case 'questions':
+        return (
+          <QuestionFlowScreen
+            onExit={() => setStage('landing')}
+            onComplete={(identity, answers) => {
+              setSubmission({ identity, answers })
+              setStage('generating')
+            }}
+          />
+        )
 
-    case 'generating':
-      return (
-        <GenerationScreen
-          generate={runGeneration}
-          onComplete={() => setStage('result')}
-          onExit={() => {
-            setSubmission(null)
-            setReview(null)
-            setStage('landing')
-          }}
-        />
-      )
+      case 'generating':
+        return (
+          <GenerationScreen
+            generate={runGeneration}
+            onComplete={() => setStage('result')}
+            onExit={() => {
+              setSubmission(null)
+              setReview(null)
+              setStage('landing')
+            }}
+          />
+        )
 
-    case 'result':
-      // The generation screen only advances once the review exists.
-      return review ? (
-        <ReviewResultScreen
-          review={review}
-          source={source}
-          onRestart={() => {
-            setSubmission(null)
-            setReview(null)
-            setStage('landing')
-          }}
-        />
-      ) : null
+      case 'result':
+        // The generation screen only advances once the review exists.
+        return review ? (
+          <ReviewResultScreen
+            review={review}
+            source={source}
+            onRestart={() => {
+              setSubmission(null)
+              setReview(null)
+              setStage('landing')
+            }}
+          />
+        ) : null
+    }
   }
+
+  return (
+    <>
+      {renderScreen()}
+      <Analytics />
+    </>
+  )
 }
 
 export default App
