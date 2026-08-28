@@ -1,37 +1,69 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI } from '@google/genai'
 import { buildUserPrompt, SYSTEM_PROMPT } from '../src/lib/review/prompt'
 import { REVIEW_JSON_SCHEMA, validateGeneratedReview } from '../src/lib/review/schema'
 import { buildFallbackReview } from '../src/lib/review/fallback'
 import type { GeneratedReview, ReviewInput } from '../src/lib/review/types'
 
-const MODEL = 'claude-opus-5'
+/**
+ * Server-side review generation.
+ *
+ * The API key is read from the server environment and never leaves this module —
+ * nothing here is imported by client code, so the key cannot reach the browser
+ * bundle.
+ */
+
+/** Fast, cost-efficient Flash-class model; override without a code change. */
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
+
+/** Generation is a user-facing wait, so it gets a hard ceiling. */
+const REQUEST_TIMEOUT_MS = 20_000
 
 /** Longest answer we will forward, so one pasted essay can't blow up the prompt. */
 const MAX_ANSWER_LENGTH = 600
 const MAX_NAME_LENGTH = 40
 
+/**
+ * Opt-in, local-only escape hatch for working on the UI without a key.
+ *
+ * It is off unless explicitly enabled, and when it does run the response is
+ * labelled `dev-fallback` so it can never be mistaken for real model output.
+ */
+const DEV_FALLBACK_ENABLED = process.env.ALLOW_DEV_FALLBACK === 'true'
+
+export type ReviewSource = 'ai' | 'dev-fallback'
+
+export interface GenerateReviewResponse {
+  review: GeneratedReview
+  source: ReviewSource
+  model: string
+}
+
 export class GenerateReviewError extends Error {
   status: number
+  code: string
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code: string) {
     super(message)
     this.name = 'GenerateReviewError'
     this.status = status
+    this.code = code
   }
 }
 
 /** Narrows untrusted request bodies to the shape the generator expects. */
 export function parseReviewInput(body: unknown): ReviewInput {
   if (typeof body !== 'object' || body === null) {
-    throw new GenerateReviewError('Expected a JSON object', 400)
+    throw new GenerateReviewError('Expected a JSON object', 400, 'bad_request')
   }
   const b = body as Record<string, unknown>
   const siblingName = typeof b.siblingName === 'string' ? b.siblingName.trim() : ''
-  if (!siblingName) throw new GenerateReviewError('siblingName is required', 400)
+  if (!siblingName) {
+    throw new GenerateReviewError('siblingName is required', 400, 'bad_request')
+  }
 
   const rawAnswers = b.answers
   if (typeof rawAnswers !== 'object' || rawAnswers === null) {
-    throw new GenerateReviewError('answers is required', 400)
+    throw new GenerateReviewError('answers is required', 400, 'bad_request')
   }
 
   const answers: Record<string, string> = {}
@@ -41,98 +73,163 @@ export function parseReviewInput(body: unknown): ReviewInput {
     }
   }
   if (Object.keys(answers).length === 0) {
-    throw new GenerateReviewError('At least one answer is required', 400)
+    throw new GenerateReviewError('At least one answer is required', 400, 'bad_request')
   }
 
   return { siblingName: siblingName.slice(0, MAX_NAME_LENGTH), answers }
 }
 
-/**
- * Writes the review with Claude, constrained to our schema.
- *
- * Structured outputs (`output_config.format`) makes the model emit exactly the
- * shape we asked for, so there is no prose to parse and no JSON to repair. We
- * still validate before returning — the schema guarantees the shape, not that
- * the content fits a fixed-size poster.
- */
-export async function generateReviewWithClaude(input: ReviewInput): Promise<GeneratedReview> {
-  // Zero-arg constructor: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,
-  // or an `ant auth login` profile.
-  const client = new Anthropic()
+/** Sent on the retry, naming what was wrong with the first attempt. */
+function correctionPrompt(previous: string, problem: string): string {
+  return [
+    'Your previous response could not be used.',
+    `Problem: ${problem}`,
+    '',
+    'Previous response:',
+    previous.slice(0, 2000),
+    '',
+    'Return corrected JSON matching the schema exactly. Respect every length limit,',
+    'return exactly 5 metrics, and keep referencing the specific details the user gave.',
+  ].join('\n')
+}
 
-  const response = await client.messages.create({
+async function callGemini(
+  ai: GoogleGenAI,
+  contents: string,
+  signal: AbortSignal,
+): Promise<string> {
+  const response = await ai.models.generateContent({
     model: MODEL,
-    max_tokens: 4000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: buildUserPrompt(input) }],
-    output_config: {
-      // Comedy writing does not need deep reasoning, and this is a user-facing
-      // wait — low effort keeps generation fast and cheap.
-      effort: 'low',
-      format: { type: 'json_schema', schema: REVIEW_JSON_SCHEMA },
+    contents,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      // Comedy needs room to vary — the same answers should not produce
+      // identical wording twice.
+      temperature: 1.0,
+      responseMimeType: 'application/json',
+      responseJsonSchema: REVIEW_JSON_SCHEMA,
+      abortSignal: signal,
     },
   })
 
-  if (response.stop_reason === 'refusal') {
-    throw new GenerateReviewError('Generation was declined', 422)
+  const text = response.text
+  if (!text) {
+    throw new GenerateReviewError('Model returned an empty response', 502, 'empty_response')
+  }
+  return text
+}
+
+/**
+ * Generates a review with Gemini, retrying once with a correction instruction.
+ *
+ * The schema constrains the shape, but not the semantics we care about — metric
+ * count, score ranges, and the length limits that keep copy inside the fixed
+ * poster. When the first attempt violates those, the model is told exactly what
+ * was wrong and asked again; a second failure is a real error, not a fallback.
+ */
+export async function generateReviewWithGemini(input: ReviewInput): Promise<GeneratedReview> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    throw new GenerateReviewError(
+      'GEMINI_API_KEY is not set on the server',
+      503,
+      'missing_api_key',
+    )
   }
 
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
+  const ai = new GoogleGenAI({ apiKey })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-  let parsed: unknown
   try {
-    parsed = JSON.parse(text)
-  } catch {
-    throw new GenerateReviewError('Model returned unparseable JSON', 502)
+    let contents = buildUserPrompt(input)
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const text = await callGemini(ai, contents, controller.signal)
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        if (attempt === 2) {
+          throw new GenerateReviewError('Model returned unparseable JSON', 502, 'invalid_json')
+        }
+        contents = correctionPrompt(text, 'the response was not valid JSON')
+        continue
+      }
+
+      const review = validateGeneratedReview(parsed)
+      if (review) {
+        // The model is told to echo the name; make certain it is theirs.
+        return { ...review, employeeName: input.siblingName.slice(0, 22) }
+      }
+
+      if (attempt === 2) {
+        throw new GenerateReviewError(
+          'Model returned a review that failed validation twice',
+          502,
+          'invalid_schema',
+        )
+      }
+      contents = correctionPrompt(
+        text,
+        'the JSON did not satisfy the schema — check that metrics has exactly 5 entries, every score is an integer 0-100, and no required field is missing or empty',
+      )
+    }
+
+    // Unreachable: the loop either returns or throws.
+    throw new GenerateReviewError('Generation failed', 502, 'generation_failed')
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const review = validateGeneratedReview(parsed)
-  if (!review) throw new GenerateReviewError('Model returned an unusable review', 502)
-
-  // The model is told to echo the name; make certain it is theirs.
-  return { ...review, employeeName: input.siblingName.slice(0, 22) }
 }
 
 /**
  * Produces a review for the given request body.
  *
- * A bad request is an error the caller should see. A failure of the model —
- * missing credentials, rate limit, a refusal — is not: the user still gets a
- * personalised review built from their own answers.
+ * A model failure is surfaced as an error rather than papered over: a silent
+ * fallback would make a broken AI pipeline indistinguishable from a working one.
+ * The offline generator is only reachable when ALLOW_DEV_FALLBACK is set, and
+ * what it returns is labelled as such.
  */
-export async function handleGenerateReview(body: unknown): Promise<GeneratedReview> {
+export async function handleGenerateReview(body: unknown): Promise<GenerateReviewResponse> {
   const input = parseReviewInput(body)
+
   try {
-    return await generateReviewWithClaude(input)
+    const review = await generateReviewWithGemini(input)
+    return { review, source: 'ai', model: MODEL }
   } catch (error) {
     if (error instanceof GenerateReviewError && error.status === 400) throw error
-    console.error('[generate-review] falling back to local generation:', error)
-    return buildFallbackReview(input, Date.now())
+
+    console.error('[generate-review] Gemini generation failed:', error)
+
+    if (DEV_FALLBACK_ENABLED) {
+      console.warn('[generate-review] ALLOW_DEV_FALLBACK is on — returning a LOCAL, NON-AI review')
+      return {
+        review: buildFallbackReview(input, Date.now()),
+        source: 'dev-fallback',
+        model: 'local-fallback',
+      }
+    }
+    throw error
   }
 }
 
 /** Vercel-style handler. Any Node host can wrap `handleGenerateReview` the same way. */
 export default async function handler(
   req: { method?: string; body?: unknown },
-  res: {
-    status: (code: number) => {
-      json: (body: unknown) => void
-      end: () => void
-    }
-  },
+  res: { status: (code: number) => { json: (body: unknown) => void } },
 ) {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' })
+    res.status(405).json({ error: { code: 'method_not_allowed', message: 'Method not allowed' } })
     return
   }
   try {
     res.status(200).json(await handleGenerateReview(req.body))
   } catch (error) {
     const status = error instanceof GenerateReviewError ? error.status : 500
+    const code = error instanceof GenerateReviewError ? error.code : 'generation_failed'
     const message = error instanceof Error ? error.message : 'Generation failed'
-    res.status(status).json({ error: message })
+    res.status(status).json({ error: { code, message } })
   }
 }

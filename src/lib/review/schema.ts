@@ -7,14 +7,33 @@ import {
 export const METRIC_COUNT = 5
 
 /**
- * JSON Schema handed to the Messages API as `output_config.format`, which
- * constrains generation to this exact shape. The validator below is still the
- * gate before anything renders — a constrained response is well-formed, but we
- * own the semantic limits (score ranges, string lengths, metric count).
+ * JSON Schema handed to Gemini as `responseJsonSchema`, which constrains
+ * generation to this exact shape.
+ *
+ * The validator below is still the gate before anything renders — a constrained
+ * response is well-formed, but we own the semantic limits (score ranges, string
+ * lengths, metric count) that keep the copy inside a fixed-size poster.
  */
 export const REVIEW_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
+  // Non-standard but supported by Gemini: writing the roast before the warm
+  // fields gives the model the same order the card is read in.
+  propertyOrdering: [
+    'employeeName',
+    'employeeEmoji',
+    'relationshipType',
+    'positionLine1',
+    'positionLine2',
+    'metrics',
+    'managerReview',
+    'award',
+    'finalDecision',
+    'reason',
+    'personalityTheme',
+    'visualMood',
+    'confidence',
+  ],
   required: [
     'employeeName',
     'employeeEmoji',

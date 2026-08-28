@@ -4,11 +4,13 @@
  * Five very different siblings must produce five visibly different reviews.
  * "Same input, same review" was the exact failure this layer exists to fix, so
  * this asserts on the axes that matter: metrics, awards, positions, manager
- * reviews, reasons and themes.
+ * reviews, reasons and themes — plus that each review echoes the user's own
+ * words, and that repeating one input still varies the wording.
  *
- * Run with:  npx tsx scripts/test-profiles.ts
- * By default it exercises the offline generator. Pass --api to hit the running
- * dev server at /api/generate-review instead (requires credentials).
+ *   npm run test:profiles          offline generator (no key needed)
+ *   npm run test:profiles -- --api the real Gemini pipeline via the dev server
+ *
+ * --api is the one that proves the AI layer works; run it before shipping.
  */
 import { buildFallbackReview } from '../src/lib/review/fallback'
 import { LIMITS } from '../src/lib/review/schema'
@@ -89,8 +91,25 @@ async function generateViaApi(input: ReviewInput): Promise<GeneratedReview> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
-  if (!res.ok) throw new Error(`API responded ${res.status}: ${await res.text()}`)
-  return (await res.json()) as GeneratedReview
+  const body = (await res.json()) as {
+    review?: GeneratedReview
+    source?: string
+    error?: { code?: string; message?: string }
+  }
+  if (!res.ok || !body.review) {
+    throw new Error(
+      `API ${res.status} ${body.error?.code ?? 'unknown'}: ${body.error?.message ?? 'no review returned'}`,
+    )
+  }
+  // A dev-fallback response is not evidence the AI pipeline works, so --api
+  // refuses to pass on one.
+  if (body.source !== 'ai') {
+    throw new Error(
+      `Expected a real AI response but got source="${body.source}". ` +
+        'Unset ALLOW_DEV_FALLBACK and set GEMINI_API_KEY to test the real pipeline.',
+    )
+  }
+  return body.review
 }
 
 function uniq(values: string[]): number {
@@ -176,8 +195,24 @@ async function main() {
     }
   }
 
+  /*
+   * The same answers should not produce word-for-word identical copy twice.
+   * Only meaningful against the real model — the offline generator is seeded
+   * from the input by design, so it is skipped there.
+   */
+  let variationNote = 'skipped (offline generator is deterministic by design)'
+  let variationOk = true
+  if (useApi) {
+    const a = await generateViaApi(PROFILES[0].input)
+    const b = await generateViaApi(PROFILES[0].input)
+    variationOk = a.managerReview !== b.managerReview || a.reason !== b.reason
+    variationNote = variationOk
+      ? 'same input produced different wording'
+      : 'same input produced identical wording twice'
+  }
+
   console.log('─'.repeat(74))
-  let failed = echoFailures > 0 || overBudget.length > 0
+  let failed = echoFailures > 0 || overBudget.length > 0 || !variationOk
   for (const c of checks) {
     const ok = c.got >= c.want
     if (!ok) failed = true
@@ -190,6 +225,7 @@ async function main() {
     `  ${overBudget.length === 0 ? '✓' : '✗'} copy fits the card without truncation` +
       (overBudget.length ? `: ${overBudget.join(', ')}` : ''),
   )
+  console.log(`  ${variationOk ? '✓' : '✗'} repeat variation: ${variationNote}`)
   console.log('─'.repeat(74))
 
   if (failed) {

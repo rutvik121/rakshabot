@@ -21,28 +21,59 @@ npm run dev
 
 ## AI review generation
 
-Answers are turned into a structured review by Claude, server-side. The model
-returns review **data** only — the card is rendered by the app, never by the
-model.
+Answers are turned into a structured review by **Google Gemini**, server-side.
+The model returns review **data** only — the card is rendered by the app, never
+by the model.
+
+| | |
+|---|---|
+| SDK | `@google/genai` |
+| Model | `gemini-3.7-flash` (override with `GEMINI_MODEL`) |
+| Structured output | `responseMimeType: application/json` + `responseJsonSchema` |
+| Route | `api/generate-review.ts` (`POST /api/generate-review`) |
+
+### Setup
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...   # or run `ant auth login`
-npm run dev                            # /api/generate-review is served in dev
+cp .env.example .env.local     # .env.local is gitignored
+# add GEMINI_API_KEY=...
+npm run dev
 ```
+
+`GEMINI_API_KEY` is read only inside `api/generate-review.ts`, which no client
+code imports — the key and the SDK are absent from the browser bundle. Never
+prefix it with `VITE_`: Vite inlines those into the client bundle.
 
 `api/generate-review.ts` is a Vercel-style serverless function; `vite-plugin-api.ts`
 serves it at the same URL during `npm run dev`, so the client's fetch path never
 changes between environments.
 
-**Without credentials the app still works.** `src/lib/review/fallback.ts` reads
-the same answers for recognisable sibling behaviours and assembles a
-personalised review offline, so a missing key degrades the writing rather than
-breaking the experience.
+### Validation and failure
+
+Gemini is constrained by the JSON schema, then the response is validated
+server-side against the semantic limits the fixed-size card needs (exactly 5
+metrics, scores 0–100, per-field length caps). **If validation fails the request
+is retried once** with an instruction naming what was wrong.
+
+If generation still fails, the route returns a real error and the UI shows a
+retryable error state. **It never silently substitutes generated-looking text** —
+that would make a broken AI pipeline indistinguishable from a working one.
+
+`ALLOW_DEV_FALLBACK=true` enables a local, non-AI generator for working on the
+UI without a key. Its responses are labelled `source: "dev-fallback"`, and the
+`--api` test refuses to pass on one.
+
+### Testing
 
 ```bash
-npm run test:profiles          # 5 very different siblings must differ
-npm run test:profiles -- --api # same, through the running API
+npm run test:profiles          # offline generator, no key needed
+npm run test:profiles -- --api # the real Gemini pipeline (needs a key + dev server)
 ```
+
+Both assert that five very different siblings produce different metrics, awards,
+manager reviews, positions, reasons and themes, that every review reuses at
+least two of the user's own words, and that no copy overflows the card. `--api`
+additionally checks that repeating one input varies the wording.
 
 ## Project structure
 

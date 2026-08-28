@@ -49,7 +49,17 @@ function App() {
       )
 
     case 'generating':
-      return <GenerationScreen generate={runGeneration} onComplete={() => setStage('result')} />
+      return (
+        <GenerationScreen
+          generate={runGeneration}
+          onComplete={() => setStage('result')}
+          onExit={() => {
+            setSubmission(null)
+            setReview(null)
+            setStage('landing')
+          }}
+        />
+      )
 
     case 'result':
       // The generation screen only advances once the review exists.
