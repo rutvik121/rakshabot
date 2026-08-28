@@ -1,0 +1,29 @@
+{
+  "//": [
+    "Compiler settings for the serverless functions.",
+    "",
+    "The root tsconfig.json is a solution file — `files: []` plus references — so",
+    "it carries no compilerOptions at all. The platform compiles api/*.ts with the",
+    "nearest tsconfig it can find, which meant bare TypeScript defaults: ES5 output,",
+    "classic module resolution, no ESM interop. A function with no relative imports",
+    "survives that; one that imports across directories does not, and fails at",
+    "runtime as an opaque 500 with no body.",
+    "",
+    "This file is what the function build should have been using all along."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "paths": { "@/*": ["../src/*"] }
+  },
+  "include": ["**/*.ts"]
+}
