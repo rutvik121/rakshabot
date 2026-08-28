@@ -7,8 +7,14 @@ export { buildFallbackReview } from './fallback'
 export { toReviewData } from './toReviewData'
 export { validateGeneratedReview } from './schema'
 
-/** Generation is a user-facing wait, so it gets a hard ceiling. */
-const REQUEST_TIMEOUT_MS = 30_000
+/**
+ * Generation is a user-facing wait, so it gets a hard ceiling.
+ *
+ * It sits above the server's own deadline (60s across both attempts) so a real
+ * model failure comes back as a specific error rather than as a bare client
+ * abort that says nothing about what went wrong.
+ */
+const REQUEST_TIMEOUT_MS = 65_000
 
 /** 'ai' is a real model response; 'dev-fallback' is the local, non-AI generator. */
 export type ReviewSource = 'ai' | 'dev-fallback'

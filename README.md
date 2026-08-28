@@ -64,6 +64,10 @@ server-side against the semantic limits the fixed-size card needs (exactly 5
 metrics, scores 0–100, per-field length caps). **If validation fails the request
 is retried once** with an instruction naming what was wrong.
 
+Thinking is turned down to `LOW` — a five-metric review does not need extended
+reasoning, and the default budget is most of the latency. Each attempt gets 35s
+and the pair share a 60s deadline, so the retry cannot double the worst case.
+
 If generation still fails, the route returns a real error and the UI shows a
 retryable error state. **It never silently substitutes generated-looking text** —
 that would make a broken AI pipeline indistinguishable from a working one.

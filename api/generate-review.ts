@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { buildUserPrompt, SYSTEM_PROMPT } from '../src/lib/review/prompt'
 import { REVIEW_JSON_SCHEMA, validateGeneratedReview } from '../src/lib/review/schema'
 import { buildFallbackReview } from '../src/lib/review/fallback'
@@ -15,8 +15,15 @@ import type { GeneratedReview, ReviewInput } from '../src/lib/review/types'
 /** Fast, cost-efficient Flash-class model; override without a code change. */
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
 
-/** Generation is a user-facing wait, so it gets a hard ceiling. */
-const REQUEST_TIMEOUT_MS = 20_000
+/**
+ * Generation is a user-facing wait, so it gets a hard ceiling — one per attempt,
+ * plus an overall deadline so the retry cannot double the worst case.
+ *
+ * A Flash-class model with thinking turned down answers this prompt in a few
+ * seconds; these numbers are the ceiling before we give up, not the expectation.
+ */
+const ATTEMPT_TIMEOUT_MS = 35_000
+const TOTAL_TIMEOUT_MS = 60_000
 
 /** Longest answer we will forward, so one pasted essay can't blow up the prompt. */
 const MAX_ANSWER_LENGTH = 600
@@ -136,6 +143,32 @@ function correctionPrompt(previous: string, problem: string): string {
   ].join('\n')
 }
 
+/**
+ * Thinking is on by default on Flash-class models and dominates the latency
+ * here, while five short metrics and a two-line memo do not need it.
+ *
+ * Not every model accepts the setting, so one that rejects it is retried
+ * without it and remembered, rather than failing every request from then on.
+ */
+let thinkingLevelSupported = true
+
+function generate(ai: GoogleGenAI, contents: string, signal: AbortSignal, withThinking: boolean) {
+  return ai.models.generateContent({
+    model: MODEL,
+    contents,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      // Comedy needs room to vary — the same answers should not produce
+      // identical wording twice.
+      temperature: 1.0,
+      ...(withThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+      responseMimeType: 'application/json',
+      responseJsonSchema: REVIEW_JSON_SCHEMA,
+      abortSignal: signal,
+    },
+  })
+}
+
 async function callGemini(
   ai: GoogleGenAI,
   contents: string,
@@ -143,21 +176,18 @@ async function callGemini(
 ): Promise<string> {
   let response
   try {
-    response = await ai.models.generateContent({
-      model: MODEL,
-      contents,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        // Comedy needs room to vary — the same answers should not produce
-        // identical wording twice.
-        temperature: 1.0,
-        responseMimeType: 'application/json',
-        responseJsonSchema: REVIEW_JSON_SCHEMA,
-        abortSignal: signal,
-      },
-    })
+    response = await generate(ai, contents, signal, thinkingLevelSupported)
   } catch (error) {
-    throw fromProviderError(error)
+    const raw = error instanceof Error ? error.message : String(error)
+    if (!thinkingLevelSupported || !/thinking/i.test(raw)) throw fromProviderError(error)
+
+    console.warn(`[generate-review] "${MODEL}" rejected thinkingLevel — retrying without it`)
+    thinkingLevelSupported = false
+    try {
+      response = await generate(ai, contents, signal, false)
+    } catch (retryError) {
+      throw fromProviderError(retryError)
+    }
   }
 
   const text = response.text
@@ -165,6 +195,32 @@ async function callGemini(
     throw new GenerateReviewError('Model returned an empty response', 502, 'empty_response')
   }
   return text
+}
+
+/**
+ * Runs one attempt against its own timeout.
+ *
+ * Each attempt gets a fresh AbortController — sharing one across the retry would
+ * leave the second attempt with whatever was left of the first one's budget,
+ * which is usually nothing.
+ */
+async function callGeminiWithTimeout(
+  ai: GoogleGenAI,
+  contents: string,
+  deadline: number,
+): Promise<string> {
+  const budget = Math.min(ATTEMPT_TIMEOUT_MS, deadline - Date.now())
+  if (budget <= 0) {
+    throw new GenerateReviewError('Gemini took too long to respond', 504, 'timeout')
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), budget)
+  try {
+    return await callGemini(ai, contents, controller.signal)
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 /**
@@ -186,50 +242,44 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Gene
   }
 
   const ai = new GoogleGenAI({ apiKey })
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const deadline = Date.now() + TOTAL_TIMEOUT_MS
+  let contents = buildUserPrompt(input)
 
-  try {
-    let contents = buildUserPrompt(input)
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const text = await callGeminiWithTimeout(ai, contents, deadline)
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const text = await callGemini(ai, contents, controller.signal)
-
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        if (attempt === 2) {
-          throw new GenerateReviewError('Model returned unparseable JSON', 502, 'invalid_json')
-        }
-        contents = correctionPrompt(text, 'the response was not valid JSON')
-        continue
-      }
-
-      const review = validateGeneratedReview(parsed)
-      if (review) {
-        // The model is told to echo the name; make certain it is theirs.
-        return { ...review, employeeName: input.siblingName.slice(0, 22) }
-      }
-
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(text)
+    } catch {
       if (attempt === 2) {
-        throw new GenerateReviewError(
-          'Model returned a review that failed validation twice',
-          502,
-          'invalid_schema',
-        )
+        throw new GenerateReviewError('Model returned unparseable JSON', 502, 'invalid_json')
       }
-      contents = correctionPrompt(
-        text,
-        'the JSON did not satisfy the schema — check that metrics has exactly 5 entries, every score is an integer 0-100, and no required field is missing or empty',
-      )
+      contents = correctionPrompt(text, 'the response was not valid JSON')
+      continue
     }
 
-    // Unreachable: the loop either returns or throws.
-    throw new GenerateReviewError('Generation failed', 502, 'generation_failed')
-  } finally {
-    clearTimeout(timeout)
+    const review = validateGeneratedReview(parsed)
+    if (review) {
+      // The model is told to echo the name; make certain it is theirs.
+      return { ...review, employeeName: input.siblingName.slice(0, 22) }
+    }
+
+    if (attempt === 2) {
+      throw new GenerateReviewError(
+        'Model returned a review that failed validation twice',
+        502,
+        'invalid_schema',
+      )
+    }
+    contents = correctionPrompt(
+      text,
+      'the JSON did not satisfy the schema — check that metrics has exactly 5 entries, every score is an integer 0-100, and no required field is missing or empty',
+    )
   }
+
+  // Unreachable: the loop either returns or throws.
+  throw new GenerateReviewError('Generation failed', 502, 'generation_failed')
 }
 
 /**
