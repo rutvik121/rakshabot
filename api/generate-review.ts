@@ -63,8 +63,26 @@ export class GenerateReviewError extends Error {
   }
 }
 
-/** Narrows untrusted request bodies to the shape the generator expects. */
-export function parseReviewInput(body: unknown): ReviewInput {
+/**
+ * Narrows untrusted request bodies to the shape the generator expects.
+ *
+ * Hosts disagree about how a JSON body arrives: some parse it, some hand over
+ * the raw string or a Buffer. Accepting all three means the same request works
+ * against the dev middleware and whatever the platform does in production —
+ * the difference is invisible until deployed, and shows up as every request
+ * failing `bad_request`.
+ */
+export function parseReviewInput(rawBody: unknown): ReviewInput {
+  let body = rawBody
+  if (body instanceof Uint8Array) body = new TextDecoder().decode(body)
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body)
+    } catch {
+      throw new GenerateReviewError('Body was not valid JSON', 400, 'bad_request')
+    }
+  }
+
   if (typeof body !== 'object' || body === null) {
     throw new GenerateReviewError('Expected a JSON object', 400, 'bad_request')
   }

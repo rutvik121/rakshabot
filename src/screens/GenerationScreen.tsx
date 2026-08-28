@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { RakshaBotMascot } from '@/components/decorative/RakshaBotMascot'
 import { StarDoodle } from '@/components/decorative/Doodles'
 import { Button } from '@/components/ui/Button'
+import { ReviewGenerationError } from '@/lib/review'
 
 interface GenerationScreenProps {
   /** Kicks off the real generation; rejects when the AI pipeline fails. */
@@ -25,7 +26,7 @@ const FINAL_HOLD_MS = 700
 export function GenerationScreen({ generate, onComplete, onExit }: GenerationScreenProps) {
   const [completed, setCompleted] = useState(0)
   const [generationDone, setGenerationDone] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
 
   const run = useCallback(() => {
@@ -35,7 +36,10 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
     generate()
       .then(() => setGenerationDone(true))
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : 'RakshaBot hit a snag.')
+        setError({
+          message: e instanceof Error ? e.message : 'RakshaBot hit a snag.',
+          code: e instanceof ReviewGenerationError ? e.code : undefined,
+        })
       })
   }, [generate])
 
@@ -93,8 +97,19 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
                 Your sibling is still being investigated. Try again.
               </p>
               <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-coral/80">
-                {error}
+                {error.message}
               </p>
+              {/*
+                The reason, verbatim. Every friendly message above covers several
+                distinct failures, so without this a broken deployment is
+                indistinguishable from a rate limit — for the user reporting it
+                and for whoever has to fix it.
+              */}
+              {error.code && (
+                <p className="font-mono text-[10px] tracking-[0.1em] text-cream/30">
+                  {error.code}
+                </p>
+              )}
             </div>
 
             <div className="flex w-full flex-col gap-3">
