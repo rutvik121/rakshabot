@@ -52,6 +52,16 @@ export async function checkHealth(live: boolean) {
 
   const report: Record<string, unknown> = {
     route: 'ok',
+    /*
+     * Which build is answering. "Redeploy" on an older deployment rebuilds that
+     * older commit, so a fix can look deployed without being deployed — this
+     * makes the difference visible instead of assumed.
+     */
+    build: {
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'unknown',
+      branch: process.env.VERCEL_GIT_COMMIT_REF ?? 'unknown',
+      environment: process.env.VERCEL_ENV ?? 'local',
+    },
     model: MODEL,
     geminiApiKey: key,
     node: process.version,

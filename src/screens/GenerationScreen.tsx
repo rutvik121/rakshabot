@@ -37,11 +37,15 @@ function summariseHealth(health: unknown): string | null {
     geminiApiKey?: { configured?: boolean; problems?: string[] }
     warning?: string
     model?: string
+    build?: { commit?: string }
   }
-  if (h.warning) return h.warning
-  if (!h.geminiApiKey?.configured) return 'the server has no GEMINI_API_KEY set'
-  if (h.geminiApiKey.problems?.length) return `the key ${h.geminiApiKey.problems[0]}`
-  return `server configured, model ${h.model ?? 'unknown'}`
+  // The build is prefixed so one screenshot says both what is wrong and which
+  // version of the code is saying it.
+  const build = h.build?.commit ? `build ${h.build.commit} · ` : ''
+  if (h.warning) return build + h.warning
+  if (!h.geminiApiKey?.configured) return `${build}the server has no GEMINI_API_KEY set`
+  if (h.geminiApiKey.problems?.length) return `${build}the key ${h.geminiApiKey.problems[0]}`
+  return `${build}server configured, model ${h.model ?? 'unknown'}`
 }
 
 export function GenerationScreen({ generate, onComplete, onExit }: GenerationScreenProps) {
