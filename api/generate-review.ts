@@ -23,7 +23,13 @@ const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
  * seconds; these numbers are the ceiling before we give up, not the expectation.
  */
 const ATTEMPT_TIMEOUT_MS = 35_000
-const TOTAL_TIMEOUT_MS = 60_000
+/*
+ * Kept under the platform's own function ceiling (`maxDuration` in
+ * vercel.json) so a slow model comes back as our friendly, retryable
+ * `timeout` — a platform kill is an opaque 504 with no body for the UI to
+ * read. Raise both together or neither.
+ */
+const TOTAL_TIMEOUT_MS = 50_000
 
 /** Longest answer we will forward, so one pasted essay can't blow up the prompt. */
 const MAX_ANSWER_LENGTH = 600

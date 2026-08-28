@@ -83,6 +83,22 @@ locally, for showing the app where no server is available. Reviews it produces
 carry a visible "Demo · sample text, not AI" badge. The flag is a compile-time
 constant, so the branch is eliminated from a normal build.
 
+### Deploying to Vercel
+
+`vercel.json` sets the framework preset and, importantly, raises the function
+ceiling — the platform default is well under the time a generation can take, and
+a platform kill is an opaque 504 with no body for the UI to read. The route's own
+deadline sits below that ceiling so a slow model comes back as a friendly,
+retryable error instead.
+
+Modules reachable from `api/` import each other **relatively**, never through the
+`@/` alias. Vite resolves the alias; the function bundler does not, and would ship
+`@/data/mockData` as an unresolved import that fails at runtime on every request.
+
+Set `GEMINI_API_KEY` in the Vercel project's environment variables. **Not**
+`VITE_GEMINI_API_KEY` — anything `VITE_`-prefixed is inlined into the browser
+bundle. Leave `ALLOW_DEV_FALLBACK` unset in production.
+
 ### Testing
 
 ```bash
