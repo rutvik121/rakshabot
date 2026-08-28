@@ -1,8 +1,8 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import { buildUserPrompt, SYSTEM_PROMPT } from '../src/lib/review/prompt'
-import { REVIEW_JSON_SCHEMA, validateGeneratedReview } from '../src/lib/review/schema'
-import { buildFallbackReview } from '../src/lib/review/fallback'
-import type { GeneratedReview, ReviewInput } from '../src/lib/review/types'
+import { buildUserPrompt, SYSTEM_PROMPT } from './_lib/prompt'
+import { REVIEW_JSON_SCHEMA, validateGeneratedReview } from './_lib/schema'
+import { buildFallbackReview } from './_lib/fallback'
+import type { GeneratedReview, ReviewInput } from './_lib/types'
 
 /**
  * Server-side review generation.

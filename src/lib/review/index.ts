@@ -1,11 +1,11 @@
-import { buildFallbackReview } from './fallback'
-import { validateGeneratedReview } from './schema'
+import { buildFallbackReview } from '../../../api/_lib/fallback'
+import { validateGeneratedReview } from '../../../api/_lib/schema'
 import type { GeneratedReview, ReviewInput } from './types'
 
 export * from './types'
-export { buildFallbackReview } from './fallback'
+export { buildFallbackReview } from '../../../api/_lib/fallback'
 export { toReviewData } from './toReviewData'
-export { validateGeneratedReview } from './schema'
+export { validateGeneratedReview } from '../../../api/_lib/schema'
 
 /**
  * Generation is a user-facing wait, so it gets a hard ceiling.

@@ -1,5 +1,5 @@
 import type { ReviewData } from '@/types'
-import type { GeneratedReview } from './types'
+import type { GeneratedReview } from '../../../api/_lib/types'
 
 /** Roast metrics run warm orange, affectionate ones pink. */
 const WARM_METRIC = /love|support|laugh|care|hug|kind|show|talent|good|help|best|heart|funny/i

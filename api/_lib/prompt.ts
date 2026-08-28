@@ -1,6 +1,4 @@
-// Relative, not the `@/` alias: this module is reachable from the serverless
-// function, and the function bundler does not know Vite's aliases.
-import { QUESTIONS } from '../../data/mockData'
+import { QUESTIONS } from './questions'
 import { LIMITS, METRIC_COUNT } from './schema'
 import type { ReviewInput } from './types'
 

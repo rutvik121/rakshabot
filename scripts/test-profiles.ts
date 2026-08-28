@@ -12,10 +12,10 @@
  *
  * --api is the one that proves the AI layer works; run it before shipping.
  */
-import { buildFallbackReview } from '../src/lib/review/fallback'
-import { LIMITS } from '../src/lib/review/schema'
-import { GENERIC_METRICS, TRAITS } from '../src/lib/review/traits'
-import type { GeneratedReview, ReviewInput } from '../src/lib/review/types'
+import { buildFallbackReview } from '../api/_lib/fallback'
+import { LIMITS } from '../api/_lib/schema'
+import { GENERIC_METRICS, TRAITS } from '../api/_lib/traits'
+import type { GeneratedReview, ReviewInput } from '../api/_lib/types'
 
 const PROFILES: { label: string; input: ReviewInput }[] = [
   {
