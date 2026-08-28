@@ -37,6 +37,9 @@ export interface Award {
   title: string
 }
 
+/** Re-exported so the card's props stay the single import for consumers. */
+export type { PersonalityTheme } from '@/lib/review/types'
+
 export interface ReviewData {
   /** Document identifier printed on the report, e.g. "RB-2026-0007" */
   documentId: string
@@ -65,4 +68,6 @@ export interface ReviewData {
   /** e.g. "Unfortunately, irreplaceable." */
   decisionReason: string
   hashtag: string
+  /** Drives the card's accent treatment; layout is identical across themes. */
+  theme?: import('@/lib/review/types').PersonalityTheme
 }

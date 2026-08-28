@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:profiles": "tsx scripts/test-profiles.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
@@ -21,6 +23,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }

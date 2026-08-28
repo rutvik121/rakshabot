@@ -5,6 +5,7 @@ import { AwardBand } from './AwardBand'
 import { Polaroid } from './Polaroid'
 import { Stamp } from './Stamp'
 import { Barcode, CropMark, CrownDoodle, StarDoodle } from '@/components/decorative/Doodles'
+import { getCardTheme, themeVars } from './cardTheme'
 
 interface ReviewCardProps {
   review: ReviewData
@@ -39,19 +40,42 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
    */
   const nameSize = Math.min(4.2, 46 / Math.max(review.employeeName.length, 1))
 
+  /*
+   * The personality theme only re-tints the card. Layout, type scale and every
+   * piece of document furniture are identical across all six, so the poster
+   * stays recognisably RakshaBot whoever it is describing.
+   */
+  const t = getCardTheme(review.theme)
+
   return (
     <article
       className={`bg-grain @container relative isolate aspect-[1080/1350] w-full max-w-[400px] overflow-hidden rounded-[3cqw] border border-cream/12 bg-ink-soft shadow-card ${className}`}
+      style={themeVars(t)}
     >
       {/* ambient wash so the dark poster never reads flat */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-[18cqw] left-1/2 -z-10 h-[60cqw] w-[60cqw] -translate-x-1/2 rounded-full opacity-50 blur-[12cqw]"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(145,97,255,0.55), rgba(255,61,129,0.3) 50%, transparent 72%)',
-        }}
+        style={{ background: t.wash }}
       />
+
+      {/* extra marks for the messier personalities */}
+      {Array.from({ length: t.sparkles }).map((_, i) => (
+        <StarDoodle
+          key={i}
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            top: `${16 + i * 21}%`,
+            left: i % 2 === 0 ? '4%' : '93%',
+            width: `${1.6 + (i % 3) * 0.5}cqw`,
+            height: `${1.6 + (i % 3) * 0.5}cqw`,
+            color: 'var(--card-award)',
+            opacity: 0.55,
+            transform: `rotate(${i * 27}deg)`,
+          }}
+        />
+      ))}
 
       {/* printer's crop marks */}
       <CropMark className="pointer-events-none absolute left-[1.5cqw] top-[1.5cqw] h-[2cqw] w-[2cqw] text-cream/20" />
@@ -64,23 +88,38 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
         <div className="flex items-center justify-between font-mono text-[1.55cqw] uppercase tracking-[0.16em] text-cream/40">
           <span>Doc · {review.documentId}</span>
           <span className="flex items-center gap-[1cqw]">
-            <span className="h-[0.7cqw] w-[0.7cqw] rounded-full bg-coral" />
+            <span
+              className="h-[0.7cqw] w-[0.7cqw] rounded-full"
+              style={{ background: 'var(--card-classified)' }}
+            />
             Classified
           </span>
         </div>
 
         {/* ─── masthead ───────────────────────────────────────── */}
         <header className="mt-[1cqw] flex flex-col items-center">
-          <CrownDoodle className="h-[3.4cqw] w-[3.4cqw] text-orange drop-shadow-[0_0.4cqw_1cqw_rgba(255,154,61,0.5)]" />
+          <CrownDoodle
+            className="h-[3.4cqw] w-[3.4cqw]"
+            style={{ color: 'var(--card-award)' }}
+          />
           <h1 className="mt-[0.5cqw] font-display text-[7.4cqw] font-extrabold uppercase leading-[0.88] tracking-[-0.03em] text-cream">
             Annual Review
           </h1>
           <div className="mt-[0.8cqw] flex items-center gap-[1.2cqw]">
-            <StarDoodle className="h-[1.3cqw] w-[1.3cqw] text-pink" />
-            <span className="font-mono text-[1.8cqw] font-medium uppercase tracking-[0.28em] text-orange">
+            <StarDoodle
+              className="h-[1.3cqw] w-[1.3cqw]"
+              style={{ color: 'var(--card-position)' }}
+            />
+            <span
+              className="font-mono text-[1.8cqw] font-medium uppercase tracking-[0.28em]"
+              style={{ color: 'var(--card-period)' }}
+            >
               {review.reviewPeriod}
             </span>
-            <StarDoodle className="h-[1.3cqw] w-[1.3cqw] text-pink" />
+            <StarDoodle
+              className="h-[1.3cqw] w-[1.3cqw]"
+              style={{ color: 'var(--card-position)' }}
+            />
           </div>
         </header>
 
@@ -109,14 +148,19 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
             <span className="mt-[1.3cqw] font-mono text-[1.6cqw] uppercase tracking-[0.2em] text-cream/40">
               Position
             </span>
-            <p className="mt-[0.3cqw] font-serif text-[2.7cqw] leading-[1.18] text-pink">
-              {review.position[0]}
-              <br />
-              <span className="text-orange">{review.position[1]}</span>
+            {/* one line each — a wrapped title would push the frame */}
+            <p
+              className="mt-[0.3cqw] w-full font-serif text-[2.7cqw] leading-[1.18]"
+              style={{ color: 'var(--card-position)' }}
+            >
+              <span className="block truncate">{review.position[0]}</span>
+              <span className="block truncate" style={{ color: 'var(--card-position-alt)' }}>
+                {review.position[1]}
+              </span>
             </p>
 
             {/* stamped across the file, balancing the polaroid's paperclip */}
-            <Stamp className="absolute -left-[3cqw] top-[14cqw] z-20" rotate={-14} />
+            <Stamp className="absolute -left-[3cqw] top-[14cqw] z-20" rotate={-14 - t.tilt} />
           </section>
 
           <section className="flex min-w-0 flex-1 flex-col gap-[1.1cqw]">
@@ -140,7 +184,7 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
               >
                 &ldquo;
               </span>
-              <blockquote className="relative flex-1 font-serif text-[2.35cqw] leading-[1.3] text-ink/85">
+              <blockquote className="relative line-clamp-4 flex-1 font-serif text-[2.35cqw] leading-[1.3] text-ink/85">
                 {review.managerReview}
               </blockquote>
               <figcaption className="mt-[1cqw] flex items-center justify-between border-t border-ink/12 pt-[0.9cqw] font-mono text-[1.4cqw] uppercase tracking-[0.14em] text-ink/45">
@@ -161,6 +205,7 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
           <DecisionStamp
             decision={review.finalDecision}
             emoji={review.decisionEmoji}
+            rotate={-3.5 - t.tilt}
             className="mt-[0.6cqw] w-full"
           />
           <div className="mt-[1.2cqw] flex flex-col items-center gap-[0.2cqw] text-center">
@@ -185,7 +230,10 @@ export function ReviewCard({ review, className = '' }: ReviewCardProps) {
             <span className="whitespace-nowrap font-display text-[1.85cqw] font-bold text-cream/85">
               Generated by RakshaBot 🤖
             </span>
-            <span className="whitespace-nowrap font-mono text-[1.6cqw] tracking-[0.03em] text-pink/80">
+            <span
+              className="whitespace-nowrap font-mono text-[1.6cqw] tracking-[0.03em]"
+              style={{ color: 'color-mix(in srgb, var(--card-position) 80%, transparent)' }}
+            >
               {review.hashtag}
             </span>
           </div>

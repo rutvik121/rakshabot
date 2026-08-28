@@ -29,7 +29,7 @@ export function DecisionStamp({
         className="pointer-events-none absolute inset-0 -inset-x-[4cqw] rounded-full opacity-30 blur-[5cqw]"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(255,61,129,0.34), rgba(255,107,94,0.12) 58%, transparent 78%)',
+            'radial-gradient(ellipse at center, color-mix(in srgb, var(--card-stamp, #ff3d81) 34%, transparent), transparent 72%)',
         }}
       />
 

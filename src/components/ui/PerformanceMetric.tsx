@@ -9,8 +9,8 @@ import type { PerformanceMetric as PerformanceMetricType } from '@/types'
  * a measuring instrument printed on the page, which is the language we want.
  */
 const TONES = {
-  roast: { ink: '#ff9a3d', score: 'text-orange' },
-  love: { ink: '#ff4d92', score: 'text-pink' },
+  roast: { ink: 'var(--card-roast, #ff9a3d)' },
+  love: { ink: 'var(--card-love, #ff4d92)' },
 } as const
 
 /** Quarter marks, so the rule reads as a graduated scale rather than a bar. */
@@ -25,7 +25,7 @@ export function PerformanceMetric({ label, score, emoji, tone }: PerformanceMetr
         <span className="shrink-0 text-[2.1cqw] leading-none" aria-hidden>
           {emoji}
         </span>
-        <span className="shrink-0 font-mono text-[1.9cqw] font-medium uppercase leading-none tracking-[0.07em] text-cream/75">
+        <span className="min-w-0 truncate font-mono text-[1.9cqw] font-medium uppercase leading-none tracking-[0.07em] text-cream/75">
           {label}
         </span>
         <span
@@ -33,7 +33,8 @@ export function PerformanceMetric({ label, score, emoji, tone }: PerformanceMetr
           className="min-w-[1cqw] flex-1 translate-y-[-0.5cqw] border-b border-dotted border-cream/20"
         />
         <span
-          className={`shrink-0 font-mono text-[2.1cqw] font-bold leading-none tabular-nums ${t.score}`}
+          className="shrink-0 font-mono text-[2.1cqw] font-bold leading-none tabular-nums"
+          style={{ color: t.ink }}
         >
           {score}%
         </span>

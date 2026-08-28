@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RakshaBotMascot } from '@/components/decorative/RakshaBotMascot'
 import { StarDoodle } from '@/components/decorative/Doodles'
 
 interface GenerationScreenProps {
+  /** Kicks off the real generation; resolves once the review is ready. */
+  generate: () => Promise<unknown>
   onComplete: () => void
 }
 
@@ -16,23 +18,44 @@ const STEPS = [
 const CURRENT_LABEL = 'Writing brutally honest manager feedback...'
 
 const STEP_DURATION_MS = 900
-const FINAL_HOLD_MS = 1100
+const FINAL_HOLD_MS = 700
 
-export function GenerationScreen({ onComplete }: GenerationScreenProps) {
+export function GenerationScreen({ generate, onComplete }: GenerationScreenProps) {
   const [completed, setCompleted] = useState(0)
+  const [generationDone, setGenerationDone] = useState(false)
 
+  // Start generation once, immediately — the checklist is theatre played over
+  // a real request, not a substitute for one.
+  const started = useRef(false)
   useEffect(() => {
-    if (completed >= STEPS.length) {
-      const finish = setTimeout(onComplete, FINAL_HOLD_MS)
-      return () => clearTimeout(finish)
-    }
+    if (started.current) return
+    started.current = true
+    generate()
+      .catch((error) => console.error('[rakshabot] generation failed:', error))
+      .finally(() => setGenerationDone(true))
+  }, [generate])
+
+  // Walk the checklist.
+  useEffect(() => {
+    if (completed >= STEPS.length) return
     const tick = setTimeout(() => setCompleted((c) => c + 1), STEP_DURATION_MS)
     return () => clearTimeout(tick)
-  }, [completed, onComplete])
+  }, [completed])
 
-  // The last stretch is the write-up itself, so the bar keeps moving after the
-  // checklist is done rather than parking at 100% and waiting.
-  const progressPct = Math.round(((completed + 0.5) / (STEPS.length + 1)) * 100)
+  // Advance only when the animation has played AND the review actually exists.
+  const stepsDone = completed >= STEPS.length
+  useEffect(() => {
+    if (!stepsDone || !generationDone) return
+    const finish = setTimeout(onComplete, FINAL_HOLD_MS)
+    return () => clearTimeout(finish)
+  }, [stepsDone, generationDone, onComplete])
+
+  // Hold just short of full while the write-up is still coming back.
+  const progressPct = stepsDone
+    ? generationDone
+      ? 100
+      : 92
+    : Math.round(((completed + 0.5) / (STEPS.length + 1)) * 100)
 
   return (
     <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-16">
