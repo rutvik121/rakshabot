@@ -28,16 +28,16 @@ export function IdentityCard({ identity, onChange }: IdentityCardProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 [@media(max-height:560px)]:gap-3">
-      <div className="flex items-start gap-4 [@media(max-height:560px)]:gap-3">
-        <span className="text-5xl leading-none [@media(max-height:560px)]:text-3xl" aria-hidden>
+    <div className="flex flex-col gap-6 compact:gap-3">
+      <div className="flex items-start gap-4 compact:gap-3">
+        <span className="text-5xl leading-none compact:text-3xl" aria-hidden>
           🫱
         </span>
         <div className="flex flex-col gap-1.5 pt-1">
-          <h2 className="font-display text-2xl font-bold leading-tight text-cream sm:text-3xl [@media(max-height:560px)]:text-xl">
+          <h2 className="font-display text-2xl font-bold leading-tight text-cream sm:text-3xl compact:text-xl">
             Who are we reviewing?
           </h2>
-          <p className="text-sm text-cream/50 [@media(max-height:560px)]:hidden">
+          <p className="text-sm text-cream/50 compact:hidden">
             Their name goes on the report. Spell it right.
           </p>
         </div>
@@ -58,25 +58,25 @@ export function IdentityCard({ identity, onChange }: IdentityCardProps) {
           placeholder="e.g. Ananya"
           maxLength={MAX_NAME_LENGTH}
           autoComplete="off"
-          className="w-full rounded-2xl border border-ink-line bg-ink-soft px-5 py-4 font-sans text-lg text-cream outline-none transition-colors placeholder:text-cream/25 focus:border-hotpink/60 focus:ring-2 focus:ring-hotpink/20 [@media(max-height:560px)]:py-2.5 [@media(max-height:560px)]:text-base"
+          className="w-full rounded-2xl border border-ink-line bg-ink-soft px-5 py-4 font-sans text-lg text-cream outline-none transition-colors placeholder:text-cream/25 focus:border-hotpink/60 focus:ring-2 focus:ring-hotpink/20 compact:py-2.5 compact:text-base"
         />
       </div>
 
       {/* photo */}
-      <div className="flex items-center gap-4 rounded-2xl border border-ink-line bg-ink-soft/60 p-4 [@media(max-height:560px)]:p-3">
+      <div className="flex items-center gap-4 rounded-2xl border border-ink-line bg-ink-soft/60 p-4 compact:p-3">
         <Polaroid
           emoji="🙂"
           photoUrl={identity.photoUrl}
           photoAlt={identity.name}
           rotate={-3}
-          className="w-20 shrink-0 [@media(max-height:560px)]:w-14"
+          className="w-20 shrink-0 compact:w-14"
         />
 
         <div className="flex min-w-0 flex-col items-start gap-1.5">
           <span className="font-display text-sm font-semibold text-cream">
             Add their photo <span className="font-normal text-cream/40">(optional)</span>
           </span>
-          <p className="text-xs leading-relaxed text-cream/45 [@media(max-height:560px)]:hidden">
+          <p className="text-xs leading-relaxed text-cream/45 compact:hidden">
             Goes in the polaroid. Skip it and they get an emoji instead.
           </p>
 

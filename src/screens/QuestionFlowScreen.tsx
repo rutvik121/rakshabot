@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button'
 import { ProgressIndicator } from '@/components/ui/ProgressIndicator'
 import { QuestionCard } from '@/components/ui/QuestionCard'
 import { IdentityCard } from '@/components/ui/IdentityCard'
-import { useViewportHeight } from '@/hooks/useViewportHeight'
+import { useKeyboardViewport } from '@/hooks/useKeyboardViewport'
 import { QUESTIONS } from '@/data/mockData'
 import type { Answers, SiblingIdentity } from '@/types'
 
@@ -16,7 +16,7 @@ interface QuestionFlowScreenProps {
 const TOTAL_STEPS = QUESTIONS.length + 1
 
 export function QuestionFlowScreen({ onComplete, onExit }: QuestionFlowScreenProps) {
-  useViewportHeight()
+  useKeyboardViewport()
 
   const [step, setStep] = useState(0)
   const [identity, setIdentity] = useState<SiblingIdentity>({ name: '' })

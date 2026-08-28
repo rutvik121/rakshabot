@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * `compact:` — the layout for when the on-screen keyboard is up.
+ *
+ * Driven by an attribute rather than `@media (max-height: ...)` because the
+ * keyboard shrinks only the visual viewport; the height a media query sees does
+ * not change. `useKeyboardViewport` sets the attribute from `visualViewport`.
+ */
+@custom-variant compact (html[data-compact] &);
+
 @theme {
   --font-display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
