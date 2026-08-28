@@ -3,7 +3,7 @@ import { LandingScreen } from '@/screens/LandingScreen'
 import { QuestionFlowScreen } from '@/screens/QuestionFlowScreen'
 import { GenerationScreen } from '@/screens/GenerationScreen'
 import { ReviewResultScreen } from '@/screens/ReviewResultScreen'
-import { generateReview, toReviewData, type ReviewResult } from '@/lib/review'
+import { generateReview, toReviewData, type ReviewResult, type ReviewSource } from '@/lib/review'
 import type { Answers, ReviewData, SiblingIdentity } from '@/types'
 
 type Stage = 'landing' | 'questions' | 'generating' | 'result'
@@ -17,6 +17,7 @@ function App() {
   const [stage, setStage] = useState<Stage>('landing')
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [review, setReview] = useState<ReviewData | null>(null)
+  const [source, setSource] = useState<ReviewSource>('ai')
 
   /*
    * Generation runs while the loading screen plays, and the screen only advances
@@ -30,6 +31,7 @@ function App() {
       answers: submission.answers,
     })
     setReview(toReviewData(result.review, submission.identity.photoUrl))
+    setSource(result.source)
     return result
   }, [submission])
 
@@ -66,6 +68,7 @@ function App() {
       return review ? (
         <ReviewResultScreen
           review={review}
+          source={source}
           onRestart={() => {
             setSubmission(null)
             setReview(null)

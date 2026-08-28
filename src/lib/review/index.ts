@@ -1,3 +1,4 @@
+import { buildFallbackReview } from './fallback'
 import { validateGeneratedReview } from './schema'
 import type { GeneratedReview, ReviewInput } from './types'
 
@@ -57,6 +58,22 @@ function messageFor(code: string, fallback: string): string {
  * integration look like a working one, both to the user and to us.
  */
 export async function generateReview(input: ReviewInput): Promise<ReviewResult> {
+  /*
+   * Demo builds (`VITE_DEMO_MODE=true`) generate locally so the app can be
+   * shown without a server — a static export has no API to call.
+   *
+   * The flag is a compile-time constant, so with it unset this branch is
+   * eliminated and a production build can never reach the local generator from
+   * here. (The generator itself still ships, because the landing page's preview
+   * card is built with it.) Anything produced here is labelled `dev-fallback`
+   * and the result screen shows a badge, so a demo review can never pass as
+   * real model output.
+   */
+  if (import.meta.env.VITE_DEMO_MODE === 'true') {
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    return { review: buildFallbackReview(input, Date.now()), source: 'dev-fallback' }
+  }
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 

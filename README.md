@@ -72,6 +72,13 @@ that would make a broken AI pipeline indistinguishable from a working one.
 UI without a key. Its responses are labelled `source: "dev-fallback"`, and the
 `--api` test refuses to pass on one.
 
+### Demo builds
+
+`VITE_DEMO_MODE=true npm run build` produces a static build that generates
+locally, for showing the app where no server is available. Reviews it produces
+carry a visible "Demo · sample text, not AI" badge. The flag is a compile-time
+constant, so the branch is eliminated from a normal build.
+
 ### Testing
 
 ```bash
