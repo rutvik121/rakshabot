@@ -40,6 +40,15 @@ cp .env.example .env.local     # .env.local is gitignored
 npm run dev
 ```
 
+`vite.config.ts` loads the server-side keys from `.env.local` into `process.env`
+for the dev API route. Vite itself only exposes `VITE_`-prefixed variables, and
+only to the client, so without that step the key would be invisible to the
+server. In production the host provides these directly.
+
+If the key is wrong or lacks access, the route says so specifically
+(`invalid_api_key`, `permission_denied`, `model_not_found`, `rate_limited`)
+rather than failing generically.
+
 `GEMINI_API_KEY` is read only inside `api/generate-review.ts`, which no client
 code imports — the key and the SDK are absent from the browser bundle. Never
 prefix it with `VITE_`: Vite inlines those into the client bundle.

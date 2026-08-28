@@ -30,7 +30,12 @@ export class ReviewGenerationError extends Error {
 function messageFor(code: string, fallback: string): string {
   switch (code) {
     case 'missing_api_key':
+    case 'invalid_api_key':
+    case 'permission_denied':
+    case 'model_not_found':
       return 'RakshaBot is not configured to reach its brain right now.'
+    case 'rate_limited':
+      return 'RakshaBot is being asked for too many reviews at once.'
     case 'timeout':
       return 'RakshaBot took too long thinking about your sibling.'
     case 'invalid_schema':
