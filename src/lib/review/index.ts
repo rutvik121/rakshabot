@@ -106,7 +106,13 @@ export async function generateReview(input: ReviewInput): Promise<ReviewResult> 
       typeof payload === 'object' && payload !== null
         ? (payload as { error?: { code?: string; message?: string } }).error
         : undefined
-    const code = err?.code ?? 'generation_failed'
+    /*
+     * No error envelope means the response did not come from our route at all
+     * — a platform 404 page when the function is not deployed, a proxy error,
+     * an HTML error page. Encoding the status distinguishes those from a route
+     * that ran and reported a real problem, which otherwise look identical.
+     */
+    const code = err?.code ?? `http_${response.status}`
     if (import.meta.env.DEV) {
       console.error('[rakshabot] generation failed:', response.status, err?.message ?? payload)
     }

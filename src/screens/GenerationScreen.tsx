@@ -23,14 +23,37 @@ const CURRENT_LABEL = 'Writing brutally honest manager feedback...'
 const STEP_DURATION_MS = 900
 const FINAL_HOLD_MS = 700
 
+/**
+ * Turns the server's self-report into one line a person can act on.
+ *
+ * A generation failure is usually a deployment problem, and the person looking
+ * at this screen is the one who can fix it — but only if they are told which
+ * problem it is. Everything here comes from `/api/health`, which never returns
+ * key material.
+ */
+function summariseHealth(health: unknown): string | null {
+  if (typeof health !== 'object' || health === null) return null
+  const h = health as {
+    geminiApiKey?: { configured?: boolean; problems?: string[] }
+    warning?: string
+    model?: string
+  }
+  if (h.warning) return h.warning
+  if (!h.geminiApiKey?.configured) return 'the server has no GEMINI_API_KEY set'
+  if (h.geminiApiKey.problems?.length) return `the key ${h.geminiApiKey.problems[0]}`
+  return `server configured, model ${h.model ?? 'unknown'}`
+}
+
 export function GenerationScreen({ generate, onComplete, onExit }: GenerationScreenProps) {
   const [completed, setCompleted] = useState(0)
   const [generationDone, setGenerationDone] = useState(false)
   const [error, setError] = useState<{ message: string; code?: string } | null>(null)
+  const [diagnosis, setDiagnosis] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
   const run = useCallback(() => {
     setError(null)
+    setDiagnosis(null)
     setGenerationDone(false)
     setCompleted(0)
     generate()
@@ -42,6 +65,29 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
         })
       })
   }, [generate])
+
+  /*
+   * Once generation has failed, ask the server what it can see about its own
+   * configuration. This runs only on the failure path, so a working app never
+   * makes the call.
+   */
+  useEffect(() => {
+    if (!error) return
+    let cancelled = false
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((health: unknown) => {
+        if (!cancelled) setDiagnosis(summariseHealth(health))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDiagnosis('the /api routes are not responding — functions may not be deployed')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [error])
 
   // Start generation once per attempt — the checklist is theatre played over a
   // real request, never a substitute for one.
@@ -105,9 +151,11 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
                 indistinguishable from a rate limit — for the user reporting it
                 and for whoever has to fix it.
               */}
-              {error.code && (
-                <p className="font-mono text-[10px] tracking-[0.1em] text-cream/30">
+              {(error.code || diagnosis) && (
+                <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-cream/30">
                   {error.code}
+                  {error.code && diagnosis ? ' · ' : ''}
+                  {diagnosis}
                 </p>
               )}
             </div>
