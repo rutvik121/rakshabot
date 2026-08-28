@@ -1,7 +1,7 @@
 import type { Connect, Plugin } from 'vite'
 
 /**
- * Serves `api/generate-review.ts` during `npm run dev`.
+ * Serves the `api/` routes during `npm run dev`.
  *
  * In production the file is deployed as a serverless function; this plugin gives
  * it the same URL locally so the client's fetch path never changes between
@@ -27,16 +27,29 @@ export function apiRoutes(): Plugin {
     name: 'rakshabot-api-routes',
     configureServer(server) {
       const handle: Connect.NextHandleFunction = async (req, res, next) => {
-        if (!req.url?.startsWith('/api/generate-review')) return next()
-
-        if (req.method !== 'POST') {
-          sendJson(res, 405, {
-            error: { code: 'method_not_allowed', message: 'Method not allowed' },
-          })
-          return
-        }
+        const path = req.url?.split('?')[0]
+        if (path !== '/api/generate-review' && path !== '/api/health') return next()
 
         try {
+          if (path === '/api/health') {
+            if (req.method !== 'GET') {
+              sendJson(res, 405, {
+                error: { code: 'method_not_allowed', message: 'Method not allowed' },
+              })
+              return
+            }
+            const mod = await server.ssrLoadModule('/api/health.ts')
+            sendJson(res, 200, await mod.checkHealth(/[?&]live=1\b/.test(req.url ?? '')))
+            return
+          }
+
+          if (req.method !== 'POST') {
+            sendJson(res, 405, {
+              error: { code: 'method_not_allowed', message: 'Method not allowed' },
+            })
+            return
+          }
+
           const chunks: Buffer[] = []
           for await (const chunk of req) chunks.push(chunk as Buffer)
           const raw = Buffer.concat(chunks).toString('utf8')
@@ -50,7 +63,7 @@ export function apiRoutes(): Plugin {
           const code = typeof e?.code === 'string' ? e.code : 'generation_failed'
           const message = error instanceof Error ? error.message : 'Generation failed'
           // Surfaced in the dev console so a broken pipeline is never silent.
-          server.config.logger.error(`[api/generate-review] ${code}: ${message}`)
+          server.config.logger.error(`[${path}] ${code}: ${message}`)
           sendJson(res, status, { error: { code, message } })
         }
       }

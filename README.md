@@ -83,6 +83,22 @@ locally, for showing the app where no server is available. Reviews it produces
 carry a visible "Demo · sample text, not AI" badge. The flag is a compile-time
 constant, so the branch is eliminated from a normal build.
 
+### Diagnosing a deployment
+
+`GET /api/health` reports what the server can see about its own configuration:
+whether `GEMINI_API_KEY` is set, its length, and whether it shows any of the
+paste damage that makes a valid key fail (wrapping quotes, a stray newline, the
+`VITE_` prefix). It never returns key material.
+
+```
+/api/health           config only, no API call
+/api/health?live=1    also makes one tiny real call to the model
+```
+
+Generation failing in production is nearly always the environment rather than
+the code, and the environment is the one thing that cannot be inspected from a
+laptop. This turns that into a single URL.
+
 ### Deploying to Vercel
 
 `vercel.json` sets the framework preset and, importantly, raises the function
