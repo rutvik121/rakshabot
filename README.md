@@ -122,6 +122,7 @@ paste damage that makes a valid key fail (wrapping quotes, a stray newline, the
 ```
 /api/health           config only, no API call
 /api/health?live=1    also makes one tiny real call to the model
+/api/health?models=1  lists the models this key can actually reach
 ```
 
 Generation failing in production is nearly always the environment rather than

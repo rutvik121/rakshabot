@@ -27,7 +27,29 @@ function diagnose(error: unknown): string {
   return 'the request to Google failed'
 }
 
-export async function checkHealth(live: boolean) {
+/**
+ * What this key can actually reach.
+ *
+ * A generation failure that is not about the key is usually about the model,
+ * and guessing which model a key can use is how several rounds of this got
+ * spent. Asking is one request and settles it.
+ */
+async function listModels(apiKey: string): Promise<unknown> {
+  try {
+    const ai = new GoogleGenAI({ apiKey })
+    const names: string[] = []
+    for await (const model of await ai.models.list()) {
+      if (model.name) names.push(model.name.replace(/^models\//, ''))
+      if (names.length >= 60) break
+    }
+    return names.length ? names : 'the key can reach no models'
+  } catch (error) {
+    console.error('[health] model list failed:', error)
+    return { failed: diagnose(error) }
+  }
+}
+
+export async function checkHealth(live: boolean, models = false) {
   const key = describeKey(process.env.GEMINI_API_KEY)
 
   const report: Record<string, unknown> = {
@@ -52,6 +74,10 @@ export async function checkHealth(live: boolean) {
   if (process.env.VITE_GEMINI_API_KEY) {
     report.warning =
       'VITE_GEMINI_API_KEY is set. That prefix publishes the key in the browser bundle and the server does not read it. Remove it and set GEMINI_API_KEY instead.'
+  }
+
+  if (models && key.configured) {
+    report.models = await listModels(normaliseKey(process.env.GEMINI_API_KEY))
   }
 
   if (!live) {
@@ -94,6 +120,8 @@ export default async function handler(
     res.status(405).json({ error: { code: 'method_not_allowed', message: 'Method not allowed' } })
     return
   }
-  const live = /[?&]live=1\b/.test(req.url ?? '')
-  res.status(200).json(await checkHealth(live))
+  const url = req.url ?? ''
+  const live = /[?&]live=1\b/.test(url)
+  const models = /[?&]models=1\b/.test(url)
+  res.status(200).json(await checkHealth(live, models))
 }

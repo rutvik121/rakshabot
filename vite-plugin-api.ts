@@ -39,7 +39,14 @@ export function apiRoutes(): Plugin {
               return
             }
             const mod = await server.ssrLoadModule('/api/health.ts')
-            sendJson(res, 200, await mod.checkHealth(/[?&]live=1\b/.test(req.url ?? '')))
+            sendJson(
+              res,
+              200,
+              await mod.checkHealth(
+                /[?&]live=1\b/.test(req.url ?? ''),
+                /[?&]models=1\b/.test(req.url ?? ''),
+              ),
+            )
             return
           }
 

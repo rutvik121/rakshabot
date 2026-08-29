@@ -157,6 +157,29 @@ export function parseReviewInput(rawBody: unknown): ReviewInput {
  * Upstream error bodies are logged but never forwarded to the client — they can
  * carry request details and internals that have no business in a browser.
  */
+/**
+ * The upstream failure, reduced to something safe to show.
+ *
+ * Google's reason is the single most useful fact when a request fails, and
+ * withholding it entirely left the app saying "could not complete the request"
+ * — true, useless, and indistinguishable from every other failure. This keeps
+ * the HTTP code, the status enum and a short slice of the message, and strips
+ * anything key-shaped on the way out.
+ */
+export function upstreamDetail(raw: string): string {
+  const status = /"?status"?\s*[:=]\s*"?([A-Z_]{4,})/.exec(raw)?.[1]
+  const code = /"?code"?\s*[:=]\s*"?(\d{3})/.exec(raw)?.[1] ?? /\[(\d{3})\s/.exec(raw)?.[1]
+  const message = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw)?.[1] ?? raw
+
+  const summary = message
+    .replace(/\\n/g, ' ')
+    .replace(/\b(AQ\.[\w.-]+|AIza[\w-]+|ya29\.[\w.-]+)/g, '[key]')
+    .trim()
+    .slice(0, 160)
+
+  return [code, status, summary].filter(Boolean).join(' ')
+}
+
 function fromProviderError(error: unknown): GenerateReviewError {
   const raw = error instanceof Error ? error.message : String(error)
 
@@ -179,7 +202,7 @@ function fromProviderError(error: unknown): GenerateReviewError {
   }
   if (/NOT_FOUND|404/.test(raw)) {
     return new GenerateReviewError(
-      `Model "${MODEL}" was not found — set GEMINI_MODEL to a model your key can use`,
+      `Model "${MODEL}" was not found — set GEMINI_MODEL to a model your key can use. ${upstreamDetail(raw)}`,
       503,
       'model_not_found',
     )
@@ -188,7 +211,7 @@ function fromProviderError(error: unknown): GenerateReviewError {
     return new GenerateReviewError('Gemini took too long to respond', 504, 'timeout')
   }
   return new GenerateReviewError(
-    'Gemini could not complete the request',
+    `Gemini could not complete the request — ${upstreamDetail(raw)}`,
     502,
     'generation_failed',
   )
