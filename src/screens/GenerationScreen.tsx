@@ -63,7 +63,9 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
   const [phase, setPhase] = useState<Phase>('analysing')
   const [completed, setCompleted] = useState(0)
   const [style, setStyle] = useState<OutputStyle | null>(null)
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null)
+  const [error, setError] = useState<{ message: string; code?: string; detail?: string } | null>(
+    null,
+  )
   const [diagnosis, setDiagnosis] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
@@ -79,6 +81,7 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
         setError({
           message: e instanceof Error ? e.message : 'RakshaBot hit a snag.',
           code: e instanceof ReviewGenerationError ? e.code : undefined,
+          detail: e instanceof ReviewGenerationError ? e.detail : undefined,
         })
       })
   }, [generate])
@@ -188,6 +191,12 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
                   {error.code}
                   {error.code && diagnosis ? ' · ' : ''}
                   {diagnosis}
+                </p>
+              )}
+              {/* What the server itself said, when it managed to say anything. */}
+              {error.detail && (
+                <p className="font-mono text-[10px] leading-relaxed tracking-[0.1em] text-cream/25">
+                  {error.detail}
                 </p>
               )}
             </div>

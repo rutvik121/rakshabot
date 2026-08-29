@@ -27,11 +27,14 @@ export interface ReviewResult {
 
 export class ReviewGenerationError extends Error {
   code: string
+  /** What the server actually said, for the diagnostic line. */
+  detail?: string
 
-  constructor(message: string, code: string) {
+  constructor(message: string, code: string, detail?: string) {
     super(message)
     this.name = 'ReviewGenerationError'
     this.code = code
+    this.detail = detail
   }
 }
 
@@ -46,6 +49,8 @@ function messageFor(code: string, fallback: string): string {
       return 'RakshaBot is being asked for too many reviews at once.'
     case 'timeout':
       return 'RakshaBot took too long thinking about your sibling.'
+    case 'module_error':
+      return 'RakshaBot could not start up properly.'
     case 'invalid_schema':
     case 'invalid_json':
     case 'empty_response':
@@ -117,7 +122,7 @@ export async function generateReview(input: ReviewInput): Promise<ReviewResult> 
     if (import.meta.env.DEV) {
       console.error('[rakshabot] generation failed:', response.status, err?.message ?? payload)
     }
-    throw new ReviewGenerationError(messageFor(code, 'RakshaBot hit a snag.'), code)
+    throw new ReviewGenerationError(messageFor(code, 'RakshaBot hit a snag.'), code, err?.message)
   }
 
   const body = payload as { review?: unknown; source?: ReviewSource } | null

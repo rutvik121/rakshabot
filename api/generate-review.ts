@@ -1,9 +1,48 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import { buildStyledUserPrompt, STYLED_SYSTEM_PROMPT } from './_lib/stylePrompt'
-import { STYLED_REVIEW_JSON_SCHEMA, validateStyledReview } from './_lib/styleSchema'
-import { buildStyledFallback } from './_lib/styleFallback'
 import type { StyledReview } from './_lib/styles'
 import type { ReviewInput } from './_lib/types'
+
+/**
+ * The prompt, schema and offline generator, loaded on first use.
+ *
+ * Anything imported at module scope that fails to load takes the whole function
+ * down before the handler exists, and the platform answers that with a bare 500
+ * — no body, no reason, nothing to act on. Loading inside the handler's guarded
+ * path means a module problem arrives as an ordinary error with its message
+ * intact, which is the difference between a diagnosis and a guess.
+ *
+ * Memoised, so the cost is paid once per warm instance rather than per request.
+ */
+let modules: Promise<{
+  buildStyledUserPrompt: typeof import('./_lib/stylePrompt').buildStyledUserPrompt
+  STYLED_SYSTEM_PROMPT: string
+  STYLED_REVIEW_JSON_SCHEMA: typeof import('./_lib/styleSchema').STYLED_REVIEW_JSON_SCHEMA
+  validateStyledReview: typeof import('./_lib/styleSchema').validateStyledReview
+  buildStyledFallback: typeof import('./_lib/styleFallback').buildStyledFallback
+}> | null = null
+
+function load() {
+  modules ??= (async () => {
+    const [prompt, schema, fallback] = await Promise.all([
+      import('./_lib/stylePrompt'),
+      import('./_lib/styleSchema'),
+      import('./_lib/styleFallback'),
+    ])
+    return {
+      buildStyledUserPrompt: prompt.buildStyledUserPrompt,
+      STYLED_SYSTEM_PROMPT: prompt.STYLED_SYSTEM_PROMPT,
+      STYLED_REVIEW_JSON_SCHEMA: schema.STYLED_REVIEW_JSON_SCHEMA,
+      validateStyledReview: schema.validateStyledReview,
+      buildStyledFallback: fallback.buildStyledFallback,
+    }
+  })().catch((error: unknown) => {
+    // Let the next request try again rather than caching a failure forever.
+    modules = null
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new GenerateReviewError(`Server modules failed to load: ${detail}`, 500, 'module_error')
+  })
+  return modules
+}
 
 /**
  * Server-side review generation.
@@ -177,18 +216,29 @@ function correctionPrompt(previous: string, problem: string): string {
  */
 let thinkingLevelSupported = true
 
-function generate(ai: GoogleGenAI, contents: string, signal: AbortSignal, withThinking: boolean) {
+interface PromptParts {
+  STYLED_SYSTEM_PROMPT: string
+  STYLED_REVIEW_JSON_SCHEMA: unknown
+}
+
+function generate(
+  ai: GoogleGenAI,
+  contents: string,
+  signal: AbortSignal,
+  withThinking: boolean,
+  parts: PromptParts,
+) {
   return ai.models.generateContent({
     model: MODEL,
     contents,
     config: {
-      systemInstruction: STYLED_SYSTEM_PROMPT,
+      systemInstruction: parts.STYLED_SYSTEM_PROMPT,
       // Comedy needs room to vary — the same answers should not produce
       // identical wording twice.
       temperature: 1.0,
       ...(withThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
       responseMimeType: 'application/json',
-      responseJsonSchema: STYLED_REVIEW_JSON_SCHEMA,
+      responseJsonSchema: parts.STYLED_REVIEW_JSON_SCHEMA,
       abortSignal: signal,
     },
   })
@@ -198,10 +248,11 @@ async function callGemini(
   ai: GoogleGenAI,
   contents: string,
   signal: AbortSignal,
+  parts: PromptParts,
 ): Promise<string> {
   let response
   try {
-    response = await generate(ai, contents, signal, thinkingLevelSupported)
+    response = await generate(ai, contents, signal, thinkingLevelSupported, parts)
   } catch (error) {
     const raw = error instanceof Error ? error.message : String(error)
     if (!thinkingLevelSupported || !/thinking/i.test(raw)) throw fromProviderError(error)
@@ -209,7 +260,7 @@ async function callGemini(
     console.warn(`[generate-review] "${MODEL}" rejected thinkingLevel — retrying without it`)
     thinkingLevelSupported = false
     try {
-      response = await generate(ai, contents, signal, false)
+      response = await generate(ai, contents, signal, false, parts)
     } catch (retryError) {
       throw fromProviderError(retryError)
     }
@@ -233,6 +284,7 @@ async function callGeminiWithTimeout(
   ai: GoogleGenAI,
   contents: string,
   deadline: number,
+  parts: PromptParts,
 ): Promise<string> {
   const budget = Math.min(ATTEMPT_TIMEOUT_MS, deadline - Date.now())
   if (budget <= 0) {
@@ -242,7 +294,7 @@ async function callGeminiWithTimeout(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), budget)
   try {
-    return await callGemini(ai, contents, controller.signal)
+    return await callGemini(ai, contents, controller.signal, parts)
   } finally {
     clearTimeout(timeout)
   }
@@ -266,12 +318,13 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Styl
     )
   }
 
+  const m = await load()
   const ai = new GoogleGenAI({ apiKey })
   const deadline = Date.now() + TOTAL_TIMEOUT_MS
-  let contents = buildStyledUserPrompt(input)
+  let contents = m.buildStyledUserPrompt(input)
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const text = await callGeminiWithTimeout(ai, contents, deadline)
+    const text = await callGeminiWithTimeout(ai, contents, deadline, m)
 
     let parsed: unknown
     try {
@@ -284,7 +337,7 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Styl
       continue
     }
 
-    const review = validateStyledReview(parsed)
+    const review = m.validateStyledReview(parsed)
     if (review) {
       // The model is told to echo the name; make certain it is theirs.
       return { ...review, subjectName: input.siblingName.slice(0, 22) }
@@ -331,7 +384,7 @@ export async function handleGenerateReview(body: unknown): Promise<GenerateRevie
         '[generate-review] ALLOW_DEV_FALLBACK is on — returning a LOCAL, NON-AI review',
       )
       return {
-        review: buildStyledFallback(input, Date.now()),
+        review: (await load()).buildStyledFallback(input, Date.now()),
         source: 'dev-fallback',
         model: 'local-fallback',
       }
