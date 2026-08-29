@@ -308,15 +308,39 @@ async function callGeminiWithTimeout(
  * poster. When the first attempt violates those, the model is told exactly what
  * was wrong and asked again; a second failure is a real error, not a fallback.
  */
-export async function generateReviewWithGemini(input: ReviewInput): Promise<StyledReview> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
+/**
+ * Rejects a key that cannot possibly work, before spending the timeout on it.
+ *
+ * A credential of the wrong kind does not come back as a clean rejection — the
+ * request simply hangs until the deadline, so the user waits the better part of
+ * a minute to be told "took too long", which points at the model rather than at
+ * the key. Google AI Studio keys are `AIza` followed by 35 characters; anything
+ * else is a different credential entirely (an OAuth token, a project id, a
+ * Vertex service account) and is worth saying so immediately.
+ *
+ * The trim is not cosmetic: a pasted trailing newline makes an otherwise valid
+ * key produce an invalid request header.
+ */
+function readApiKey(): string {
+  const raw = process.env.GEMINI_API_KEY
+  if (!raw?.trim()) {
+    throw new GenerateReviewError('GEMINI_API_KEY is not set on the server', 503, 'missing_api_key')
+  }
+
+  const key = raw.trim().replace(/^["']|["']$/g, '')
+  if (!/^AIza[\w-]{20,}$/.test(key)) {
     throw new GenerateReviewError(
-      'GEMINI_API_KEY is not set on the server',
+      'GEMINI_API_KEY is not a Google AI Studio key. Those begin with "AIza" — ' +
+        'get one at aistudio.google.com/apikey and set it in the deployment environment.',
       503,
-      'missing_api_key',
+      'invalid_api_key',
     )
   }
+  return key
+}
+
+export async function generateReviewWithGemini(input: ReviewInput): Promise<StyledReview> {
+  const apiKey = readApiKey()
 
   const m = await load()
   const ai = new GoogleGenAI({ apiKey })
