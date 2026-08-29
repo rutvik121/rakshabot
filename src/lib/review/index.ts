@@ -42,6 +42,9 @@ function messageFor(code: string, fallback: string): string {
   switch (code) {
     case 'missing_api_key':
     case 'invalid_api_key':
+    case 'invalid_service_account':
+    case 'missing_project':
+    case 'api_not_enabled':
     case 'permission_denied':
     case 'model_not_found':
       return 'RakshaBot is not configured to reach its brain right now.'

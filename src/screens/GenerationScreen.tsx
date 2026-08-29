@@ -47,16 +47,20 @@ const ASSIGNED_MS = 1500
 function summariseHealth(health: unknown): string | null {
   if (typeof health !== 'object' || health === null) return null
   const h = health as {
-    geminiApiKey?: { configured?: boolean; problems?: string[] }
+    backend?: { kind?: string; ready?: boolean; project?: string; problems?: string[] }
     warning?: string
     model?: string
     build?: { commit?: string }
   }
   const build = h.build?.commit ? `build ${h.build.commit} · ` : ''
   if (h.warning) return build + h.warning
-  if (!h.geminiApiKey?.configured) return `${build}the server has no GEMINI_API_KEY set`
-  if (h.geminiApiKey.problems?.length) return `${build}the key ${h.geminiApiKey.problems[0]}`
-  return `${build}server configured, model ${h.model ?? 'unknown'}`
+
+  const backend = h.backend
+  if (!backend) return `${build}the server did not report its configuration`
+  const via = backend.kind === 'vertex' ? `vertex${backend.project ? ` ${backend.project}` : ''}` : 'api key'
+  if (backend.problems?.length) return `${build}${via}: ${backend.problems[0]}`
+  if (!backend.ready) return `${build}${via} is not configured`
+  return `${build}${via} configured, model ${h.model ?? 'unknown'}`
 }
 
 export function GenerationScreen({ generate, onComplete, onExit }: GenerationScreenProps) {

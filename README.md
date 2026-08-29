@@ -48,6 +48,7 @@ correction rather than rendered with holes in it.
 | | |
 |---|---|
 | SDK | `@google/genai` |
+| Backend | Gemini API (`GEMINI_API_KEY`) or Vertex AI (`GOOGLE_SERVICE_ACCOUNT_KEY`) |
 | Model | `gemini-3.7-flash` (override with `GEMINI_MODEL`) |
 | Structured output | `responseMimeType: application/json` + `responseJsonSchema` |
 | Route | `api/generate-review.ts` (`POST /api/generate-review`) |
@@ -60,27 +61,63 @@ cp .env.example .env.local     # .env.local is gitignored
 npm run dev
 ```
 
-`vite.config.ts` loads the server-side keys from `.env.local` into `process.env`
-for the dev API route. Vite itself only exposes `VITE_`-prefixed variables, and
-only to the client, so without that step the key would be invisible to the
-server. In production the host provides these directly.
+`vite.config.ts` loads the server-side variables from `.env.local` into
+`process.env` for the dev API route. Vite itself only exposes `VITE_`-prefixed
+variables, and only to the client, so without that step they would be invisible
+to the server. In production the host provides them directly.
 
-AI Studio issues keys starting `AQ.`; older keys start `AIza`. Both are
-accepted. The route checks the key's shape before making a request, because a
+The route checks the credential's shape before making a request, because a
 credential of the wrong kind does not get cleanly rejected — it hangs until the
-deadline and reports a timeout, which blames the model for something the key
-did. Wrong credentials are named rather than merely refused (an OAuth token, a
-service-account JSON, a project id), and paste damage is reported even on a
-valid key, since a trailing newline is invisible in a dashboard field and breaks
-the request header.
+deadline and reports a timeout, which blames the model for something the
+environment did. Wrong credentials are named rather than merely refused (an
+OAuth token, a service-account JSON where a key belongs, a project id), and
+paste damage is reported even on a valid key, since a trailing newline is
+invisible in a dashboard field and breaks the request header.
 
-If the key is wrong or lacks access, the route says so specifically
-(`invalid_api_key`, `permission_denied`, `model_not_found`, `rate_limited`)
-rather than failing generically.
+If the credential is wrong or lacks access, the route says so specifically
+(`invalid_api_key`, `invalid_service_account`, `api_not_enabled`,
+`permission_denied`, `model_not_found`, `rate_limited`) rather than failing
+generically.
 
-`GEMINI_API_KEY` is read only inside `api/generate-review.ts`, which no client
-code imports — the key and the SDK are absent from the browser bundle. Never
-prefix it with `VITE_`: Vite inlines those into the client bundle.
+Credentials are read only inside `api/`, which no client code imports — they
+and the SDK are absent from the browser bundle. Never prefix one with `VITE_`:
+Vite inlines those into the client bundle.
+
+### If your API key starts with `AQ.`
+
+AI Studio has begun issuing keys prefixed `AQ.` in place of the older `AIza`,
+and `generativelanguage.googleapis.com` currently rejects them with
+`401 ACCESS_TOKEN_TYPE_UNSUPPORTED` — through the SDK, through
+`x-goog-api-key`, and through `?key=` alike. It is a Google-side issue with no
+client-side fix, and some accounts can no longer obtain an `AIza` key at all
+(Cloud Console issues `AQ.` too).
+
+**Vertex AI serves the same models under different authentication**, so it is
+the way out. Set `GOOGLE_SERVICE_ACCOUNT_KEY` and the app switches backends —
+no code change, and `GEMINI_API_KEY` is then ignored.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com), pick or
+   create a project and note its **project id**.
+2. **APIs & Services → Enable APIs** → enable **Vertex AI API**.
+3. **IAM & Admin → Service Accounts → Create service account**. Give it the
+   **Vertex AI User** role.
+4. On that service account: **Keys → Add key → Create new key → JSON**. A file
+   downloads.
+5. Set `GOOGLE_SERVICE_ACCOUNT_KEY` to the entire contents of that file (one
+   line is fine; base64 also works if the dashboard mangles it), and
+   `GOOGLE_CLOUD_PROJECT` to the project id if the key does not carry one.
+   Locally that is `.env.local`; on Vercel it is **Settings → Environment
+   Variables**, then redeploy.
+6. Confirm with `/api/health?live=1` — it should report
+   `backend.kind: "vertex"` and `gemini.reachable: true`.
+
+`GOOGLE_CLOUD_LOCATION` defaults to `global`, which is where Vertex serves the
+newest models; set a region only if you need one. Vertex AI is billed per
+token, so the project needs billing enabled — that is the real cost of this
+route, and the reason the API key remains the default when one works.
+
+The service-account JSON is a private key. It is read server-side only, never
+returned by `/api/health`, and `.env.local` is gitignored — do not commit it.
 
 `api/generate-review.ts` is a Vercel-style serverless function; `vite-plugin-api.ts`
 serves it at the same URL during `npm run dev`, so the client's fetch path never
@@ -115,14 +152,14 @@ constant, so the branch is eliminated from a normal build.
 ### Diagnosing a deployment
 
 `GET /api/health` reports what the server can see about its own configuration:
-whether `GEMINI_API_KEY` is set, its length, and whether it shows any of the
-paste damage that makes a valid key fail (wrapping quotes, a stray newline, the
-`VITE_` prefix). It never returns key material.
+which backend is selected, whether it is ready, and — on the API-key path — the
+key's length and any paste damage that makes a valid key fail (wrapping quotes,
+a stray newline, the `VITE_` prefix). It never returns credential material.
 
 ```
 /api/health           config only, no API call
 /api/health?live=1    also makes one tiny real call to the model
-/api/health?models=1  lists the models this key can actually reach
+/api/health?models=1  lists the models this key can reach (API-key path only)
 ```
 
 Generation failing in production is nearly always the environment rather than
@@ -144,9 +181,12 @@ extensionless import resolves in Vite and in every local test, then fails at
 runtime as a 500 with no body. `api/tsconfig.json` uses `NodeNext`, so the
 compiler rejects that mistake rather than letting it reach production.
 
-Set `GEMINI_API_KEY` in the Vercel project's environment variables. **Not**
-`VITE_GEMINI_API_KEY` — anything `VITE_`-prefixed is inlined into the browser
-bundle. Leave `ALLOW_DEV_FALLBACK` unset in production.
+Set `GEMINI_API_KEY` in the Vercel project's environment variables — or
+`GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_CLOUD_PROJECT` for the Vertex path.
+**Not** `VITE_`-prefixed — anything with that prefix is inlined into the browser
+bundle. Leave `ALLOW_DEV_FALLBACK` unset in production. Environment variables
+are read at request time, but a change still needs a redeploy to reach the
+running functions.
 
 ### Testing
 

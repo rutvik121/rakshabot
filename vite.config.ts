@@ -16,7 +16,15 @@ import { apiRoutes } from './vite-plugin-api'
  * In production the host (Vercel and friends) provides these directly, so this
  * is a development-only convenience.
  */
-const SERVER_ENV_KEYS = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'ALLOW_DEV_FALLBACK'] as const
+const SERVER_ENV_KEYS = [
+  'GEMINI_API_KEY',
+  'GEMINI_MODEL',
+  'ALLOW_DEV_FALLBACK',
+  // The Vertex AI path: a service-account JSON plus where to send the request.
+  'GOOGLE_SERVICE_ACCOUNT_KEY',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+] as const
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {

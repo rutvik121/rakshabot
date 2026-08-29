@@ -1,7 +1,11 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import { describeKey, isUsableKey, normaliseKey } from './_lib/apiKey.js'
+import { normaliseKey } from './_lib/apiKey.js'
+import { createBackend, type Backend, type BackendKind } from './_lib/backend.js'
+import { GenerateReviewError } from './_lib/errors.js'
 import type { StyledReview } from './_lib/styles.js'
 import type { ReviewInput } from './_lib/types.js'
+
+export { GenerateReviewError }
 
 /**
  * The prompt, schema and offline generator, loaded on first use.
@@ -90,18 +94,8 @@ export interface GenerateReviewResponse {
   review: StyledReview
   source: ReviewSource
   model: string
-}
-
-export class GenerateReviewError extends Error {
-  status: number
-  code: string
-
-  constructor(message: string, status: number, code: string) {
-    super(message)
-    this.name = 'GenerateReviewError'
-    this.status = status
-    this.code = code
-  }
+  /** Which way in was used — 'vertex' or 'api-key'. */
+  backend?: string
 }
 
 /**
@@ -180,7 +174,7 @@ export function upstreamDetail(raw: string): string {
   return [code, status, summary].filter(Boolean).join(' ')
 }
 
-function fromProviderError(error: unknown): GenerateReviewError {
+function fromProviderError(error: unknown, backend: BackendKind): GenerateReviewError {
   const raw = error instanceof Error ? error.message : String(error)
 
   if (/API_KEY_INVALID|API key not valid/i.test(raw)) {
@@ -198,20 +192,42 @@ function fromProviderError(error: unknown): GenerateReviewError {
    * stops it reading as an application bug.
    */
   if (/UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|\b401\b/.test(raw)) {
+    if (backend === 'vertex') {
+      return new GenerateReviewError(
+        'Vertex AI would not accept the service account — check the key has not been deleted or ' +
+          `disabled in Cloud Console. ${upstreamDetail(raw)}`,
+        503,
+        'invalid_service_account',
+      )
+    }
     const looksNewFormat = normaliseKey(process.env.GEMINI_API_KEY).startsWith('AQ.')
     return new GenerateReviewError(
       looksNewFormat
         ? 'Google rejected this key. Keys beginning "AQ." are currently not accepted by the ' +
-          'Gemini API — a known Google-side issue. An "AIza" key works; try creating one in ' +
-          'Google Cloud Console (APIs & Services → Credentials) or under a different Google account.'
+          'Gemini API, however they are sent — a known Google-side issue with no client fix. ' +
+          'Switch this deployment to Vertex AI: set GOOGLE_SERVICE_ACCOUNT_KEY (and ' +
+          'GOOGLE_CLOUD_PROJECT) and the same models are reached with service-account auth instead. ' +
+          'See README → "If your API key starts with AQ.".'
         : `Google rejected the credentials. ${upstreamDetail(raw)}`,
       503,
       'invalid_api_key',
     )
   }
+  if (/has not been used in project|SERVICE_DISABLED|API has not been used/i.test(raw)) {
+    const api = backend === 'vertex' ? 'Vertex AI API' : 'Generative Language API'
+    return new GenerateReviewError(
+      `The ${api} is not enabled on this Google Cloud project. Enable it in the Cloud Console ` +
+        `(/api/health names the project), then retry. ${upstreamDetail(raw)}`,
+      503,
+      'api_not_enabled',
+    )
+  }
   if (/PERMISSION_DENIED|403/.test(raw)) {
     return new GenerateReviewError(
-      'The API key lacks access to this model',
+      backend === 'vertex'
+        ? 'The service account lacks access. Grant it the "Vertex AI User" role on the project ' +
+          `(IAM → Grant access), then retry. ${upstreamDetail(raw)}`
+        : 'The API key lacks access to this model',
       503,
       'permission_denied',
     )
@@ -221,13 +237,39 @@ function fromProviderError(error: unknown): GenerateReviewError {
   }
   if (/NOT_FOUND|404/.test(raw)) {
     return new GenerateReviewError(
-      `Model "${MODEL}" was not found — set GEMINI_MODEL to a model your key can use. ${upstreamDetail(raw)}`,
+      backend === 'vertex'
+        ? `Model "${MODEL}" is not available in this Vertex region. Set GOOGLE_CLOUD_LOCATION to ` +
+          `"global", or GEMINI_MODEL to a model the region serves. ${upstreamDetail(raw)}`
+        : `Model "${MODEL}" was not found — set GEMINI_MODEL to a model your key can use. ${upstreamDetail(raw)}`,
       503,
       'model_not_found',
     )
   }
   if (/abort/i.test(raw)) {
     return new GenerateReviewError('Gemini took too long to respond', 504, 'timeout')
+  }
+  /*
+   * Signing failed before a request was ever made. OpenSSL reports this as
+   * "DECODER routines::unsupported", which names nothing a person can act on —
+   * the actual cause is always the same, a private key that lost its newlines
+   * or its header on the way into an environment variable.
+   */
+  if (backend === 'vertex' && /DECODER routines|ERR_OSSL|no start line|PEM/i.test(raw)) {
+    return new GenerateReviewError(
+      'The private_key in GOOGLE_SERVICE_ACCOUNT_KEY could not be read — it is truncated, or its ' +
+        'line breaks were lost. Re-paste the downloaded key file exactly, or set the variable to ' +
+        'its base64 encoding instead.',
+      503,
+      'invalid_service_account',
+    )
+  }
+  if (backend === 'vertex' && /invalid_grant|invalid_client|JWT/i.test(raw)) {
+    return new GenerateReviewError(
+      'Google would not exchange the service account for a token. The key may have been deleted ' +
+        `or disabled, or the service account removed from the project. ${upstreamDetail(raw)}`,
+      503,
+      'invalid_service_account',
+    )
   }
   return new GenerateReviewError(
     `Gemini could not complete the request — ${upstreamDetail(raw)}`,
@@ -360,7 +402,7 @@ export function resetFeatureMemory(): void {
 }
 
 async function callGemini(
-  ai: GoogleGenAI,
+  backend: Backend,
   contents: string,
   signal: AbortSignal,
   parts: PromptParts,
@@ -368,10 +410,10 @@ async function callGemini(
   let response
   try {
     response = await withSupportedFeatures((features) =>
-      generate(ai, contents, signal, features, parts),
+      generate(backend.ai, contents, signal, features, parts),
     )
   } catch (error) {
-    throw fromProviderError(error)
+    throw fromProviderError(error, backend.kind)
   }
 
   const text = response.text
@@ -389,7 +431,7 @@ async function callGemini(
  * which is usually nothing.
  */
 async function callGeminiWithTimeout(
-  ai: GoogleGenAI,
+  backend: Backend,
   contents: string,
   deadline: number,
   parts: PromptParts,
@@ -402,7 +444,7 @@ async function callGeminiWithTimeout(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), budget)
   try {
-    return await callGemini(ai, contents, controller.signal, parts)
+    return await callGemini(backend, contents, controller.signal, parts)
   } finally {
     clearTimeout(timeout)
   }
@@ -435,42 +477,24 @@ export function parseJson(text: string): unknown {
  * poster. When the first attempt violates those, the model is told exactly what
  * was wrong and asked again; a second failure is a real error, not a fallback.
  */
-/**
- * Rejects a key that cannot possibly work, before spending the timeout on it.
- *
- * A credential of the wrong kind does not come back as a clean rejection — the
- * request simply hangs until the deadline, so the user waits the better part of
- * a minute to be told "took too long", which points at the model rather than at
- * the key.
- */
-function readApiKey(): string {
-  const raw = process.env.GEMINI_API_KEY
-  const report = describeKey(raw)
-
-  if (!report.configured) {
-    throw new GenerateReviewError('GEMINI_API_KEY is not set on the server', 503, 'missing_api_key')
-  }
-  if (!isUsableKey(raw)) {
-    throw new GenerateReviewError(
-      `GEMINI_API_KEY ${report.problems?.[0] ?? 'does not look like a Gemini API key'}. ` +
-        'Get one at aistudio.google.com/apikey and set it in the deployment environment.',
-      503,
-      'invalid_api_key',
-    )
-  }
-  return normaliseKey(raw)
-}
-
-export async function generateReviewWithGemini(input: ReviewInput): Promise<StyledReview> {
-  const apiKey = readApiKey()
+export async function generateReviewWithGemini(
+  input: ReviewInput,
+): Promise<{ review: StyledReview; backend: string }> {
+  /*
+   * Credentials are settled before anything else runs. A credential of the
+   * wrong kind does not come back as a clean rejection — the request simply
+   * hangs until the deadline, so the user waits the better part of a minute to
+   * be told "took too long", which points at the model rather than at the
+   * environment.
+   */
+  const backend = createBackend()
 
   const m = await load()
-  const ai = new GoogleGenAI({ apiKey })
   const deadline = Date.now() + TOTAL_TIMEOUT_MS
   let contents = m.buildStyledUserPrompt(input)
 
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const text = await callGeminiWithTimeout(ai, contents, deadline, m)
+    const text = await callGeminiWithTimeout(backend, contents, deadline, m)
 
     let parsed: unknown
     try {
@@ -486,7 +510,10 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Styl
     const review = m.validateStyledReview(parsed)
     if (review) {
       // The model is told to echo the name; make certain it is theirs.
-      return { ...review, subjectName: input.siblingName.slice(0, 22) }
+      return {
+        review: { ...review, subjectName: input.siblingName.slice(0, 22) },
+        backend: backend.label,
+      }
     }
 
     if (attempt === 2) {
@@ -518,8 +545,8 @@ export async function handleGenerateReview(body: unknown): Promise<GenerateRevie
   const input = parseReviewInput(body)
 
   try {
-    const review = await generateReviewWithGemini(input)
-    return { review, source: 'ai', model: MODEL }
+    const { review, backend } = await generateReviewWithGemini(input)
+    return { review, source: 'ai', model: MODEL, backend }
   } catch (error) {
     if (error instanceof GenerateReviewError && error.status === 400) throw error
 

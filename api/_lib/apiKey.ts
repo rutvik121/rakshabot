@@ -71,13 +71,15 @@ export function describeKey(raw: string | undefined): KeyReport {
   /*
    * Shape-valid but currently unusable: AI Studio has begun issuing `AQ.` keys
    * that generativelanguage.googleapis.com rejects with 401 however they are
-   * sent. Worth flagging up front, since the request will fail and the cause
-   * is not in this codebase.
+   * sent. Worth flagging up front, since the request will fail, the cause is
+   * not in this codebase, and the way out is a different backend rather than a
+   * different key.
    */
   if (key.startsWith('AQ.')) {
     problems.push(
       'is an "AQ." key, which the Gemini API is currently rejecting with 401 — a known ' +
-        'Google-side issue. An "AIza" key works',
+        'Google-side issue with no client-side fix. Set GOOGLE_SERVICE_ACCOUNT_KEY to reach the ' +
+        'same models through Vertex AI instead (see README)',
     )
   }
 

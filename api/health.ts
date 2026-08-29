@@ -1,5 +1,5 @@
+import { createBackend, describeBackend } from './_lib/backend.js'
 import { GoogleGenAI } from '@google/genai'
-import { describeKey, normaliseKey } from './_lib/apiKey.js'
 
 /**
  * Configuration check for the deployed generation route.
@@ -10,8 +10,8 @@ import { describeKey, normaliseKey } from './_lib/apiKey.js'
  * own configuration, so diagnosing a broken deploy is one URL rather than a
  * dig through dashboards and logs.
  *
- * It never returns key material — only whether a key is present, how long it
- * is, and which of the usual paste mistakes it shows signs of.
+ * It never returns credential material — only which backend is selected, and
+ * what is wrong with it.
  */
 
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
@@ -20,29 +20,34 @@ const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
 function diagnose(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   if (/API_KEY_INVALID|API key not valid/i.test(raw)) return 'the key was rejected by Google'
-  if (/PERMISSION_DENIED|403/.test(raw)) return 'the key exists but lacks access to this model'
-  if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) return 'the key is over its quota'
-  if (/NOT_FOUND|404/.test(raw)) return `the model "${MODEL}" does not exist for this key`
+  if (/ACCESS_TOKEN_TYPE_UNSUPPORTED/.test(raw)) {
+    return 'Google refused to treat the key as an API key — the "AQ." key problem'
+  }
+  if (/has not been used in project|SERVICE_DISABLED|is disabled/i.test(raw)) {
+    return 'the Vertex AI API is not enabled on this Google Cloud project'
+  }
+  if (/PERMISSION_DENIED|403/.test(raw)) return 'the credential lacks access to this model'
+  if (/RESOURCE_EXHAUSTED|429|quota/i.test(raw)) return 'the credential is over its quota'
+  if (/NOT_FOUND|404/.test(raw)) return `the model "${MODEL}" is not available here`
   if (/abort|timeout/i.test(raw)) return 'Google did not respond in time'
   return 'the request to Google failed'
 }
 
 /**
- * What this key can actually reach.
+ * What this credential can actually reach.
  *
- * A generation failure that is not about the key is usually about the model,
- * and guessing which model a key can use is how several rounds of this got
- * spent. Asking is one request and settles it.
+ * A generation failure that is not about the credential is usually about the
+ * model, and guessing which model is reachable is how several rounds of this
+ * got spent. Asking is one request and settles it.
  */
-async function listModels(apiKey: string): Promise<unknown> {
+async function listModels(ai: GoogleGenAI): Promise<unknown> {
   try {
-    const ai = new GoogleGenAI({ apiKey })
     const names: string[] = []
     for await (const model of await ai.models.list()) {
       if (model.name) names.push(model.name.replace(/^models\//, ''))
       if (names.length >= 60) break
     }
-    return names.length ? names : 'the key can reach no models'
+    return names.length ? names : 'this credential can reach no models'
   } catch (error) {
     console.error('[health] model list failed:', error)
     return { failed: diagnose(error) }
@@ -50,7 +55,7 @@ async function listModels(apiKey: string): Promise<unknown> {
 }
 
 export async function checkHealth(live: boolean, models = false) {
-  const key = describeKey(process.env.GEMINI_API_KEY)
+  const backend = describeBackend()
 
   const report: Record<string, unknown> = {
     route: 'ok',
@@ -65,7 +70,7 @@ export async function checkHealth(live: boolean, models = false) {
       environment: process.env.VERCEL_ENV ?? 'local',
     },
     model: MODEL,
-    geminiApiKey: key,
+    backend,
     node: process.version,
     devFallbackEnabled: process.env.ALLOW_DEV_FALLBACK === 'true',
   }
@@ -76,22 +81,39 @@ export async function checkHealth(live: boolean, models = false) {
       'VITE_GEMINI_API_KEY is set. That prefix publishes the key in the browser bundle and the server does not read it. Remove it and set GEMINI_API_KEY instead.'
   }
 
-  if (models && key.configured) {
-    report.models = await listModels(normaliseKey(process.env.GEMINI_API_KEY))
+  if (!backend.ready) {
+    report.gemini = 'not tested — the backend is not configured'
+    return report
+  }
+
+  /*
+   * Building the client can itself fail — a malformed service account is caught
+   * here rather than as an opaque 500.
+   */
+  let ai: GoogleGenAI
+  try {
+    ai = createBackend().ai
+  } catch (error) {
+    report.gemini = { reachable: false, cause: error instanceof Error ? error.message : 'unknown' }
+    return report
+  }
+
+  if (models) {
+    // Vertex's list endpoint returns the project's own tuned models, not the
+    // published ones, so it answers a different question than it does here.
+    report.models =
+      backend.kind === 'vertex'
+        ? 'not listed — on Vertex, model availability is per region; use ?live=1 instead'
+        : await listModels(ai)
   }
 
   if (!live) {
     report.gemini = 'not tested — add ?live=1 to make one real call'
     return report
   }
-  if (!key.configured) {
-    report.gemini = 'not tested — no key configured'
-    return report
-  }
 
-  // One deliberately tiny call: enough to prove the key and model work.
+  // One deliberately tiny call: enough to prove the credential and model work.
   try {
-    const ai = new GoogleGenAI({ apiKey: normaliseKey(process.env.GEMINI_API_KEY) })
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 20_000)
     try {
