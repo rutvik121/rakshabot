@@ -1,59 +1,59 @@
 /**
- * Differentiation test for the review generator.
+ * Differentiation test for the styled generator.
  *
- * Five very different siblings must produce five visibly different reviews.
- * "Same input, same review" was the exact failure this layer exists to fix, so
- * this asserts on the axes that matter: metrics, awards, positions, manager
- * reviews, reasons and themes — plus that each review echoes the user's own
- * words, and that repeating one input still varies the wording.
+ * Six very different siblings must land in different universes and produce
+ * visibly different artifacts. "Same input, same output" was the failure this
+ * whole layer exists to fix, so this asserts on the axes that matter: which
+ * style was chosen, the headline and verdict copy, whether the user's own words
+ * survived, and whether anything overruns the fixed card.
  *
  *   npm run test:profiles          offline generator (no key needed)
  *   npm run test:profiles -- --api the real Gemini pipeline via the dev server
  *
  * --api is the one that proves the AI layer works; run it before shipping.
  */
-import { buildFallbackReview } from '../api/_lib/fallback'
-import { LIMITS } from '../api/_lib/schema'
-import { GENERIC_METRICS, TRAITS } from '../api/_lib/traits'
-import type { GeneratedReview, ReviewInput } from '../api/_lib/types'
+import { buildStyledFallback } from '../api/_lib/styleFallback'
+import { validateStyledReview } from '../api/_lib/styleSchema'
+import type { StyledReview } from '../api/_lib/styles'
+import type { ReviewInput } from '../api/_lib/types'
 
 const PROFILES: { label: string; input: ReviewInput }[] = [
   {
-    label: '1. Food-stealing mischief',
+    label: '1. Thief, denies everything',
     input: {
       siblingName: 'Rhea',
       answers: {
-        habit: 'Eats my food off my plate without asking, every single time',
-        spend: 'Ordering way too much food on Swiggy',
+        habit: 'Takes my things and swears she never touched them',
+        spend: 'Ordering way too much food on Swiggy at midnight',
         talent: 'Somehow always knows when the fridge has been restocked',
-        steals: 'My snacks, my leftovers, my last piece of chocolate',
+        steals: 'My snacks, my hoodie, my last piece of chocolate',
         love: 'She saves me the last bite when it actually matters',
       },
     },
   },
   {
-    label: '2. Shoe-shopping spender',
+    label: '2. Dramatic and iconic',
     input: {
       siblingName: 'Aditi',
       answers: {
-        habit: 'Shopping online at 2am and forgetting what she ordered',
+        habit: 'Making an entire scene about the wifi being slow',
         spend: 'Another pair of sneakers she absolutely does not need',
-        talent: 'Finding a sale nobody else can find',
-        steals: 'My jacket and never returning it',
-        love: 'She buys me things she thinks I need without telling me',
+        talent: 'Walking into a room and owning it instantly',
+        steals: 'My jacket, for the photos, every weekend',
+        love: 'She fought a shopkeeper who overcharged me',
       },
     },
   },
   {
-    label: '3. Quiet but supportive',
+    label: '3. Quiet, nostalgic, supportive',
     input: {
       siblingName: 'Meera',
       answers: {
         habit: 'Never says what is wrong, just goes quiet for days',
         spend: 'Probably books or something for the house',
-        talent: 'Listening without making it about herself',
+        talent: 'Listening without ever making it about herself',
         steals: 'Nothing really, she asks first',
-        love: 'She shows up and helps me every time I fall apart, no questions',
+        love: 'She waited outside my exam hall for three hours',
       },
     },
   },
@@ -71,28 +71,41 @@ const PROFILES: { label: string; input: ReviewInput }[] = [
     },
   },
   {
-    label: '5. Responsible but annoying elder',
+    label: '5. Expensive and unpredictable',
     input: {
       siblingName: 'Arjun',
       answers: {
-        habit: 'Lecturing me about my life choices unprompted',
-        spend: 'Something sensible like an investment, boringly',
+        habit: 'Buying things he cannot afford and asking to borrow money',
+        spend: 'A mechanical keyboard, then bus fare off me',
         talent: 'Fixing anything that breaks in the house',
-        steals: 'My charger, and then telling me I lose things',
+        steals: 'My charger, then telling me I lose things',
         love: 'He has quietly handled things for me my whole life',
+      },
+    },
+  },
+  {
+    label: '6. Sleeps, eats, repeats',
+    input: {
+      siblingName: 'Vihaan',
+      answers: {
+        habit: 'Sleeping until 2pm and calling it a schedule',
+        spend: 'Food. Always food. Every single time.',
+        talent: 'Falling asleep anywhere within ninety seconds',
+        steals: 'The last plate of biryani, always',
+        love: 'He makes chai for me without being asked',
       },
     },
   },
 ]
 
-async function generateViaApi(input: ReviewInput): Promise<GeneratedReview> {
+async function generateViaApi(input: ReviewInput): Promise<StyledReview> {
   const res = await fetch('http://localhost:5173/api/generate-review', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
   const body = (await res.json()) as {
-    review?: GeneratedReview
+    review?: StyledReview
     source?: string
     error?: { code?: string; message?: string }
   }
@@ -116,84 +129,133 @@ function uniq(values: string[]): number {
   return new Set(values.map((v) => v.toLowerCase().trim())).size
 }
 
+/** Every string in the artifact, for word-echo and length checks. */
+function allText(review: StyledReview): string {
+  return JSON.stringify(review).toLowerCase()
+}
+
+/** A one-line summary of what the card will actually say. */
+function describe(review: StyledReview): string[] {
+  const c = review.content as Record<string, unknown>
+  const lines = [
+    `  style      ${review.style}`,
+    `  headline   ${review.headline}`,
+    `  verdict    ${review.finalVerdict.title} — ${review.finalVerdict.reason}`,
+  ]
+  switch (review.style) {
+    case 'CASE_FILE':
+      lines.push(`  charges    ${review.content.charges.map((x) => x.title).join(' · ')}`)
+      break
+    case 'AWARDS_NIGHT':
+      lines.push(`  awards     ${review.content.awards.map((x) => x.category).join(' · ')}`)
+      break
+    case 'SIBLING_WRAPPED':
+      lines.push(
+        `  stats      ${review.content.stats.map((x) => `${x.value} ${x.label}`).join(' · ')}`,
+      )
+      break
+    case 'SCRAPBOOK':
+      lines.push(`  annoys     ${review.content.thingsThatAnnoyMe.join(' · ')}`)
+      lines.push(`  secret     ${review.content.secretNote}`)
+      break
+    case 'STOCK_REPORT':
+      lines.push(
+        `  metrics    ${review.content.performanceOverview.map((x) => `${x.metric} ${x.value}`).join(' · ')}`,
+      )
+      break
+    case 'CHARACTER_STATS':
+      lines.push(`  build      LV${review.content.level} ${review.content.class} · ${c.rarity}`)
+      lines.push(`  ability    ${review.content.specialAbility}`)
+      break
+  }
+  return lines
+}
+
 async function main() {
   const useApi = process.argv.includes('--api')
-  console.log(`\nGenerating 5 profiles via ${useApi ? 'the API' : 'the offline generator'}\n`)
+  console.log(
+    `\nGenerating ${PROFILES.length} profiles via ${useApi ? 'the API' : 'the offline generator'}\n`,
+  )
 
-  const reviews: GeneratedReview[] = []
+  const reviews: StyledReview[] = []
   for (const { label, input } of PROFILES) {
-    const review = useApi ? await generateViaApi(input) : buildFallbackReview(input)
+    const review = useApi ? await generateViaApi(input) : buildStyledFallback(input)
     reviews.push(review)
-
     console.log('─'.repeat(74))
-    console.log(`${label}  —  ${review.employeeName}`)
+    console.log(`${label}  —  ${review.subjectName}`)
     console.log('─'.repeat(74))
-    console.log(`  theme      ${review.personalityTheme}  (${review.visualMood})`)
-    console.log(`  position   ${review.positionLine1} / ${review.positionLine2}`)
-    console.log(`  metrics    ${review.metrics.map((m) => `${m.label} ${m.score}`).join(' · ')}`)
-    console.log(`  award      ${review.award.emoji} ${review.award.title}`)
-    console.log(`  review     ${review.managerReview}`)
-    console.log(`  reason     ${review.reason}`)
+    for (const line of describe(review)) console.log(line)
     console.log()
   }
 
   // ── assertions ───────────────────────────────────────────────────
-  const checks: { name: string; got: number; want: number }[] = [
+  const checks: { name: string; got: number; want: number; of: number }[] = [
     {
-      name: 'distinct metric sets',
-      got: uniq(reviews.map((r) => r.metrics.map((m) => m.label).join('|'))),
-      want: 5,
+      name: 'different siblings get different universes',
+      got: uniq(reviews.map((r) => r.style)),
+      want: 3,
+      of: PROFILES.length,
     },
-    { name: 'distinct awards', got: uniq(reviews.map((r) => r.award.title)), want: 4 },
-    { name: 'distinct manager reviews', got: uniq(reviews.map((r) => r.managerReview)), want: 5 },
     {
-      name: 'distinct positions',
-      got: uniq(reviews.map((r) => `${r.positionLine1}/${r.positionLine2}`)),
-      want: 4,
+      name: 'distinct headlines',
+      got: uniq(reviews.map((r) => r.headline)),
+      want: 3,
+      of: PROFILES.length,
     },
-    { name: 'distinct reasons', got: uniq(reviews.map((r) => r.reason)), want: 4 },
-    { name: 'distinct themes', got: uniq(reviews.map((r) => r.personalityTheme)), want: 3 },
+    {
+      name: 'distinct verdict reasons',
+      got: uniq(reviews.map((r) => r.finalVerdict.reason)),
+      want: 3,
+      of: PROFILES.length,
+    },
+    {
+      name: 'distinct card contents',
+      got: uniq(reviews.map((r) => JSON.stringify(r.content))),
+      want: PROFILES.length,
+      of: PROFILES.length,
+    },
   ]
 
-  // Every review must echo the user's own words back at them.
+  /*
+   * The whole promise is that the card could not have been written without
+   * these answers, so at least three of the user's own words must survive.
+   */
   let echoFailures = 0
   PROFILES.forEach((p, i) => {
-    const answerWords = Object.values(p.input.answers)
-      .join(' ')
-      .toLowerCase()
-      .match(/[a-z]{5,}/g)
-    const blob = [reviews[i].managerReview, reviews[i].positionLine1, reviews[i].award.title]
-      .join(' ')
-      .toLowerCase()
-      const hits = new Set((answerWords ?? []).filter((w) => blob.includes(w)))
-    if (hits.size < 2) {
-      console.log(`  ✗ ${p.label}: only ${hits.size} of the user's own words survived`)
+    const answerWords = new Set(
+      Object.values(p.input.answers).join(' ').toLowerCase().match(/[a-z]{5,}/g) ?? [],
+    )
+    const blob = allText(reviews[i])
+    const hits = [...answerWords].filter((w) => blob.includes(w))
+    if (hits.length < 3) {
+      console.log(`  ✗ ${p.label}: only ${hits.length} of the user's own words survived`)
       echoFailures++
     }
   })
 
   /*
-   * The card truncates over-long strings so a stray model response can never
-   * break the fixed frame — but the offline generator should never rely on that
-   * safety net, or its own copy renders with an ellipsis mid-phrase.
+   * Round-tripping through the validator clamps anything over budget. If that
+   * changes the artifact, the generator is relying on the card's truncation
+   * safety net — which renders as an ellipsis mid-phrase.
    */
-  const overBudget: string[] = []
-  for (const m of [...TRAITS.flatMap((t) => t.metrics), ...GENERIC_METRICS]) {
-    if (m.label.length > LIMITS.metricLabel) overBudget.push(`metric "${m.label}"`)
-  }
-  for (const t of TRAITS) {
-    for (const pos of t.positions) {
-      if (pos.length > LIMITS.positionLine) overBudget.push(`position "${pos}"`)
-    }
-    for (const a of t.awards) {
-      if (a.title.length > LIMITS.awardTitle) overBudget.push(`award "${a.title}"`)
-    }
-  }
-  for (const r of reviews) {
-    if (r.managerReview.length > LIMITS.managerReview) {
-      overBudget.push(`manager review for ${r.employeeName}`)
-    }
-  }
+  // The validator rebuilds objects, so compare by value rather than key order.
+  const stable = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(stable)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(
+            Object.entries(v as Record<string, unknown>)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([k, val]) => [k, stable(val)]),
+          )
+        : v
+
+  const overBudget = reviews
+    .filter((r) => {
+      const round = validateStyledReview(JSON.parse(JSON.stringify(r)))
+      return JSON.stringify(stable(round)) !== JSON.stringify(stable(r))
+    })
+    .map((r) => `${r.subjectName} (${r.style})`)
 
   /*
    * The same answers should not produce word-for-word identical copy twice.
@@ -205,7 +267,7 @@ async function main() {
   if (useApi) {
     const a = await generateViaApi(PROFILES[0].input)
     const b = await generateViaApi(PROFILES[0].input)
-    variationOk = a.managerReview !== b.managerReview || a.reason !== b.reason
+    variationOk = JSON.stringify(a.content) !== JSON.stringify(b.content)
     variationNote = variationOk
       ? 'same input produced different wording'
       : 'same input produced identical wording twice'
@@ -216,10 +278,10 @@ async function main() {
   for (const c of checks) {
     const ok = c.got >= c.want
     if (!ok) failed = true
-    console.log(`  ${ok ? '✓' : '✗'} ${c.name}: ${c.got}/5 distinct (need ≥ ${c.want})`)
+    console.log(`  ${ok ? '✓' : '✗'} ${c.name}: ${c.got}/${c.of} distinct (need ≥ ${c.want})`)
   }
   console.log(
-    `  ${echoFailures === 0 ? '✓' : '✗'} personalisation: every review reuses ≥2 of the user's words`,
+    `  ${echoFailures === 0 ? '✓' : '✗'} personalisation: every card reuses ≥3 of the user's words`,
   )
   console.log(
     `  ${overBudget.length === 0 ? '✓' : '✗'} copy fits the card without truncation` +
@@ -229,7 +291,7 @@ async function main() {
   console.log('─'.repeat(74))
 
   if (failed) {
-    console.error('\nFAILED — different answers are still producing similar reviews.\n')
+    console.error('\nFAILED — different answers are still producing similar artifacts.\n')
     process.exit(1)
   }
   console.log('\nAll profiles differentiated.\n')

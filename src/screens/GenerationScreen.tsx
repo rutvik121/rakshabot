@@ -2,26 +2,39 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { RakshaBotMascot } from '@/components/decorative/RakshaBotMascot'
 import { StarDoodle } from '@/components/decorative/Doodles'
 import { Button } from '@/components/ui/Button'
-import { ReviewGenerationError } from '@/lib/review'
+import { ReviewGenerationError, type ReviewResult } from '@/lib/review'
+import { STYLE_REVEAL, type OutputStyle } from '@/lib/review/styles'
 
 interface GenerationScreenProps {
   /** Kicks off the real generation; rejects when the AI pipeline fails. */
-  generate: () => Promise<unknown>
+  generate: () => Promise<ReviewResult>
   onComplete: () => void
   onExit: () => void
 }
 
 const STEPS = [
-  'Investigating annoying habits',
-  'Reviewing suspicious behaviour',
-  'Calculating emotional damage',
-  'Identifying good qualities',
+  'Reviewing behavioural evidence',
+  'Detecting personality patterns',
+  'Measuring chaos levels',
+  'Identifying emotional attachment',
 ]
 
-const CURRENT_LABEL = 'Writing brutally honest manager feedback...'
+/**
+ * The wait is a reveal, not a spinner.
+ *
+ * The product's claim is that this sibling gets an artifact chosen for *them*,
+ * so the moment that claim becomes visible — the system declining to run a
+ * standard review and assigning something else instead — is worth staging.
+ * Generation runs underneath the whole time; the assignment beat simply cannot
+ * play until the model has actually chosen, so the theatre never outruns the
+ * truth.
+ */
+type Phase = 'analysing' | 'determining' | 'verdict' | 'assigned'
 
-const STEP_DURATION_MS = 900
-const FINAL_HOLD_MS = 700
+const STEP_MS = 720
+const DETERMINING_MS = 1100
+const VERDICT_MS = 1300
+const ASSIGNED_MS = 1500
 
 /**
  * Turns the server's self-report into one line a person can act on.
@@ -39,8 +52,6 @@ function summariseHealth(health: unknown): string | null {
     model?: string
     build?: { commit?: string }
   }
-  // The build is prefixed so one screenshot says both what is wrong and which
-  // version of the code is saying it.
   const build = h.build?.commit ? `build ${h.build.commit} · ` : ''
   if (h.warning) return build + h.warning
   if (!h.geminiApiKey?.configured) return `${build}the server has no GEMINI_API_KEY set`
@@ -49,8 +60,9 @@ function summariseHealth(health: unknown): string | null {
 }
 
 export function GenerationScreen({ generate, onComplete, onExit }: GenerationScreenProps) {
+  const [phase, setPhase] = useState<Phase>('analysing')
   const [completed, setCompleted] = useState(0)
-  const [generationDone, setGenerationDone] = useState(false)
+  const [style, setStyle] = useState<OutputStyle | null>(null)
   const [error, setError] = useState<{ message: string; code?: string } | null>(null)
   const [diagnosis, setDiagnosis] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -58,10 +70,11 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
   const run = useCallback(() => {
     setError(null)
     setDiagnosis(null)
-    setGenerationDone(false)
+    setStyle(null)
     setCompleted(0)
+    setPhase('analysing')
     generate()
-      .then(() => setGenerationDone(true))
+      .then((result) => setStyle(result.review.style))
       .catch((e: unknown) => {
         setError({
           message: e instanceof Error ? e.message : 'RakshaBot hit a snag.',
@@ -69,6 +82,15 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
         })
       })
   }, [generate])
+
+  // Start generation once per attempt — the sequence is played over a real
+  // request, never as a substitute for one.
+  const startedFor = useRef(-1)
+  useEffect(() => {
+    if (startedFor.current === attempt) return
+    startedFor.current = attempt
+    run()
+  }, [attempt, run])
 
   /*
    * Once generation has failed, ask the server what it can see about its own
@@ -93,38 +115,44 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
     }
   }, [error])
 
-  // Start generation once per attempt — the checklist is theatre played over a
-  // real request, never a substitute for one.
-  const startedFor = useRef(-1)
+  // The analysis checklist ticks through on its own.
   useEffect(() => {
-    if (startedFor.current === attempt) return
-    startedFor.current = attempt
-    run()
-  }, [attempt, run])
+    if (error || phase !== 'analysing') return
+    if (completed >= STEPS.length) {
+      const t = setTimeout(() => setPhase('determining'), 320)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => setCompleted((n) => n + 1), STEP_MS)
+    return () => clearTimeout(t)
+  }, [completed, phase, error])
 
-  // Walk the checklist.
+  /*
+   * The assignment beat waits for the model. Holding here rather than guessing
+   * is the whole reason the reveal is honest: the style named on screen is the
+   * style that was actually chosen.
+   */
   useEffect(() => {
-    if (error || completed >= STEPS.length) return
-    const tick = setTimeout(() => setCompleted((c) => c + 1), STEP_DURATION_MS)
-    return () => clearTimeout(tick)
-  }, [completed, error])
+    if (error || phase !== 'determining' || !style) return
+    const t = setTimeout(() => setPhase('verdict'), DETERMINING_MS)
+    return () => clearTimeout(t)
+  }, [phase, style, error])
 
-  // Advance only when the animation has played AND the review actually exists.
-  const stepsDone = completed >= STEPS.length
   useEffect(() => {
-    if (error || !stepsDone || !generationDone) return
-    const finish = setTimeout(onComplete, FINAL_HOLD_MS)
-    return () => clearTimeout(finish)
-  }, [stepsDone, generationDone, error, onComplete])
+    if (error || phase !== 'verdict') return
+    const t = setTimeout(() => setPhase('assigned'), VERDICT_MS)
+    return () => clearTimeout(t)
+  }, [phase, error])
 
-  const progressPct = stepsDone
-    ? generationDone
-      ? 100
-      : 92
-    : Math.round(((completed + 0.5) / (STEPS.length + 1)) * 100)
+  useEffect(() => {
+    if (error || phase !== 'assigned') return
+    const t = setTimeout(onComplete, ASSIGNED_MS)
+    return () => clearTimeout(t)
+  }, [phase, error, onComplete])
+
+  const reveal = style ? STYLE_REVEAL[style] : null
 
   return (
-    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-16">
+    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-6 py-12">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple/25 blur-3xl"
@@ -176,58 +204,65 @@ export function GenerationScreen({ generate, onComplete, onExit }: GenerationScr
               </button>
             </div>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2">
-              <h1 className="font-display text-2xl font-extrabold text-cream sm:text-3xl">
-                Reviewing employee performance...
-              </h1>
-              <p className="font-mono text-xs uppercase tracking-[0.14em] text-cream/40">
-                RakshaBot HR is on the case
-              </p>
-            </div>
+        ) : phase === 'analysing' || phase === 'determining' ? (
+          <div className="flex w-full flex-col items-center gap-5" aria-live="polite">
+            <h1 className="font-display text-2xl font-extrabold uppercase tracking-tight text-cream sm:text-3xl">
+              Analysing sibling…
+            </h1>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-line">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-hotpink to-orange transition-[width] duration-[900ms] ease-in-out"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-
-            <div className="flex w-full flex-col gap-3 rounded-2xl border border-ink-line bg-ink-soft px-5 py-5 text-left">
-              {STEPS.map((label, i) => {
+            <ul className="flex w-full flex-col gap-2 text-left">
+              {STEPS.map((step, i) => {
                 const done = i < completed
                 return (
-                  <div
-                    key={label}
-                    className={`flex items-center gap-3 text-sm transition-all duration-500 ease-out ${
-                      done ? 'translate-x-0 text-cream/80' : '-translate-x-1 text-cream/30'
+                  <li
+                    key={step}
+                    className={`flex items-center gap-3 text-sm transition-all duration-500 ${
+                      done ? 'text-cream/80' : 'text-cream/25'
                     }`}
                   >
                     <span
-                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] transition-all duration-500 ${
+                      aria-hidden
+                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] transition-colors duration-500 ${
                         done
-                          ? 'scale-100 border-hotpink bg-hotpink/20 text-pink'
-                          : 'scale-90 border-ink-line text-transparent'
+                          ? 'border-hotpink bg-hotpink/15 text-hotpink'
+                          : 'border-cream/15 text-transparent'
                       }`}
                     >
                       ✓
                     </span>
-                    {label}
-                  </div>
+                    {step}
+                  </li>
                 )
               })}
+            </ul>
 
-              <div className="flex items-center gap-3 text-sm font-medium text-cream">
-                <span className="flex shrink-0 gap-0.5">
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-pink [animation-delay:-0.2s]" />
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-pink" />
-                  <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-pink [animation-delay:0.2s]" />
-                </span>
-                {CURRENT_LABEL}
-              </div>
-            </div>
-          </>
+            <p
+              className={`font-mono text-[11px] uppercase tracking-[0.18em] transition-opacity duration-500 ${
+                phase === 'determining' ? 'text-orange opacity-100' : 'opacity-0'
+              }`}
+            >
+              Determining appropriate evaluation system…
+            </p>
+          </div>
+        ) : phase === 'verdict' ? (
+          <div className="flex flex-col items-center gap-3" aria-live="polite">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-coral">
+              Standard review not suitable.
+            </p>
+            <h1 className="font-display text-2xl font-extrabold uppercase leading-tight tracking-tight text-cream sm:text-3xl">
+              Assigning evaluation method…
+            </h1>
+          </div>
+        ) : (
+          <div className="flex animate-[fade-up_420ms_ease-out] flex-col items-center gap-3" aria-live="polite">
+            <span aria-hidden className="text-5xl leading-none">
+              {reveal?.emoji}
+            </span>
+            <h1 className="font-display text-2xl font-extrabold uppercase leading-tight tracking-tight text-cream sm:text-[32px]">
+              {reveal?.label}
+            </h1>
+            <p className="text-sm text-cream/55">Building their artifact…</p>
+          </div>
         )}
       </div>
     </div>

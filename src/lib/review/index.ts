@@ -1,11 +1,12 @@
-import { buildFallbackReview } from '../../../api/_lib/fallback'
-import { validateGeneratedReview } from '../../../api/_lib/schema'
-import type { GeneratedReview, ReviewInput } from './types'
+import { buildStyledFallback } from '../../../api/_lib/styleFallback'
+import { validateStyledReview } from '../../../api/_lib/styleSchema'
+import type { StyledReview } from './styles'
+import type { ReviewInput } from './types'
 
 export * from './types'
-export { buildFallbackReview } from '../../../api/_lib/fallback'
-export { toReviewData } from './toReviewData'
-export { validateGeneratedReview } from '../../../api/_lib/schema'
+export * from './styles'
+export { buildStyledFallback } from '../../../api/_lib/styleFallback'
+export { validateStyledReview } from '../../../api/_lib/styleSchema'
 
 /**
  * Generation is a user-facing wait, so it gets a hard ceiling.
@@ -20,7 +21,7 @@ const REQUEST_TIMEOUT_MS = 65_000
 export type ReviewSource = 'ai' | 'dev-fallback'
 
 export interface ReviewResult {
-  review: GeneratedReview
+  review: StyledReview
   source: ReviewSource
 }
 
@@ -77,7 +78,7 @@ export async function generateReview(input: ReviewInput): Promise<ReviewResult> 
    */
   if (import.meta.env.VITE_DEMO_MODE === 'true') {
     await new Promise((resolve) => setTimeout(resolve, 1200))
-    return { review: buildFallbackReview(input, Date.now()), source: 'dev-fallback' }
+    return { review: buildStyledFallback(input, Date.now()), source: 'dev-fallback' }
   }
 
   const controller = new AbortController()
@@ -120,7 +121,7 @@ export async function generateReview(input: ReviewInput): Promise<ReviewResult> 
   }
 
   const body = payload as { review?: unknown; source?: ReviewSource } | null
-  const review = validateGeneratedReview(body?.review)
+  const review = validateStyledReview(body?.review)
   if (!review) {
     throw new ReviewGenerationError(
       messageFor('invalid_schema', 'RakshaBot returned something unusable.'),

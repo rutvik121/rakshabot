@@ -3,9 +3,10 @@ import { LandingScreen } from '@/screens/LandingScreen'
 import { QuestionFlowScreen } from '@/screens/QuestionFlowScreen'
 import { GenerationScreen } from '@/screens/GenerationScreen'
 import { ReviewResultScreen } from '@/screens/ReviewResultScreen'
-import { generateReview, toReviewData, type ReviewResult, type ReviewSource } from '@/lib/review'
+import { generateReview, type ReviewResult, type ReviewSource } from '@/lib/review'
+import type { StyledReview } from '@/lib/review/styles'
 import { TemplateGallery } from '@/dev/TemplateGallery'
-import type { Answers, ReviewData, SiblingIdentity } from '@/types'
+import type { Answers, SiblingIdentity } from '@/types'
 
 type Stage = 'landing' | 'questions' | 'generating' | 'result'
 
@@ -36,7 +37,7 @@ function ReviewFlow() {
 
   const [stage, setStage] = useState<Stage>('landing')
   const [submission, setSubmission] = useState<Submission | null>(null)
-  const [review, setReview] = useState<ReviewData | null>(null)
+  const [review, setReview] = useState<StyledReview | null>(null)
   const [source, setSource] = useState<ReviewSource>('ai')
 
   /*
@@ -50,7 +51,7 @@ function ReviewFlow() {
       siblingName: submission.identity.name,
       answers: submission.answers,
     })
-    setReview(toReviewData(result.review, submission.identity.photoUrl))
+    setReview(result.review)
     setSource(result.source)
     return result
   }, [submission])
@@ -88,6 +89,7 @@ function ReviewFlow() {
       return review ? (
         <ReviewResultScreen
           review={review}
+          photoUrl={submission?.identity.photoUrl}
           source={source}
           onRestart={() => {
             setSubmission(null)

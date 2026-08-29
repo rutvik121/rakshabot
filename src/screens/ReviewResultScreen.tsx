@@ -1,17 +1,24 @@
 import { Button } from '@/components/ui/Button'
-import { ReviewCard } from '@/components/ui/ReviewCard'
+import { ResultCard } from '@/components/result/ResultCard'
 import { HeartDoodle } from '@/components/decorative/Doodles'
-import type { ReviewData } from '@/types'
+import type { StyledReview } from '@/lib/review/styles'
 import type { ReviewSource } from '@/lib/review'
 
 interface ReviewResultScreenProps {
-  review: ReviewData
+  review: StyledReview
+  /** The photo the user gave, if any. */
+  photoUrl?: string
   /** Anything other than 'ai' is labelled on screen, never passed off as real. */
   source?: ReviewSource
   onRestart: () => void
 }
 
-export function ReviewResultScreen({ review, source = 'ai', onRestart }: ReviewResultScreenProps) {
+export function ReviewResultScreen({
+  review,
+  photoUrl,
+  source = 'ai',
+  onRestart,
+}: ReviewResultScreenProps) {
   return (
     <div className="relative flex min-h-svh flex-col items-center overflow-hidden px-5 pb-12 pt-9 sm:px-6 sm:pt-12">
       <div
@@ -42,7 +49,7 @@ export function ReviewResultScreen({ review, source = 'ai', onRestart }: ReviewR
       </header>
 
       <div className="relative z-10 mt-8 flex w-full justify-center [&>*]:w-full [&>*]:max-w-[400px]">
-        <ReviewCard review={review} />
+        <ResultCard review={review} photoUrl={photoUrl} />
       </div>
 
       {/* actions */}

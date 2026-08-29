@@ -2,9 +2,24 @@
 
 Rate. Roast. Retain. ❤️
 
-Give your sibling their Annual Performance Review for Raksha Bandhan — a
-shareable, Spotify-Wrapped-meets-confidential-HR-document card built with
-React, TypeScript, Tailwind CSS, and Vite.
+**One sibling. Many worlds.**
+
+Answer five questions about your sibling and RakshaBot decides how they should
+be remembered — then builds that artifact. Not every sibling deserves a
+performance review; some deserve an investigation.
+
+| Style | For the sibling who is… |
+|---|---|
+| `CASE_FILE` | suspicious, chaotic, denies everything |
+| `AWARDS_NIGHT` | iconic, dramatic, legendary in the family |
+| `SIBLING_WRAPPED` | the same fights, jokes and rituals on repeat |
+| `SCRAPBOOK` | nostalgic, tender, tied up with childhood |
+| `STOCK_REPORT` | expensive, volatile, impossible to divest |
+| `CHARACTER_STATS` | competitive, obsessive, a fictional character |
+
+The model chooses the style *and* writes its content; the app renders the
+matching template. Every artifact is one 1080×1350 portrait image that reads
+standalone in a feed, with no scrolling.
 
 ## Stack
 
@@ -21,9 +36,14 @@ npm run dev
 
 ## AI review generation
 
-Answers are turned into a structured review by **Google Gemini**, server-side.
-The model returns review **data** only — the card is rendered by the app, never
-by the model.
+Answers are turned into a structured artifact by **Google Gemini**, server-side.
+The model returns **data** only — including which of the six styles fits this
+sibling — and the app renders it. The model never describes layout or colour.
+
+`content` is a discriminated union: a different shape per style, validated
+server-side against the counts and lengths each template is built for. A
+response that fills the wrong set of fields is rejected and retried with a
+correction rather than rendered with holes in it.
 
 | | |
 |---|---|
@@ -122,10 +142,14 @@ npm run test:profiles          # offline generator, no key needed
 npm run test:profiles -- --api # the real Gemini pipeline (needs a key + dev server)
 ```
 
-Both assert that five very different siblings produce different metrics, awards,
-manager reviews, positions, reasons and themes, that every review reuses at
-least two of the user's own words, and that no copy overflows the card. `--api`
-additionally checks that repeating one input varies the wording.
+Both assert that six very different siblings land in different universes and
+produce different content, that every card reuses at least three of the user's
+own words, and that nothing overruns the fixed frame. `--api` additionally
+checks that repeating one input varies the wording.
+
+Under `npm run dev`, `?preview=all` renders every template side by side,
+`?preview=<STYLE>` renders one, `?preview=stress` renders a worst-case artifact,
+and `&width=1080` renders at true export size. DEV only.
 
 ## Project structure
 
@@ -135,7 +159,10 @@ src/
     ui/           Reusable UI primitives (Button, Badge, Stamp, ShareCard, ...)
     decorative/    Small SVG doodles (stars, hearts, crown, tape, barcode)
   screens/         Landing, question flow, generation, and result screens
-  lib/review/      Generation: schema, prompt, offline fallback, card mapping
+  components/
+    result/        The six output templates and the style renderer
+  lib/review/      Client generation entry; re-exports the shared api/_lib types
+  dev/             DEV-only template gallery
   data/            The question set and the landing-page preview
   types.ts         Shared domain types
 ```

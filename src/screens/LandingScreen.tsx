@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { ReviewCard } from '@/components/ui/ReviewCard'
+import { ResultCard } from '@/components/result/ResultCard'
 import { HeartDoodle, StarDoodle } from '@/components/decorative/Doodles'
 import { PREVIEW_REVIEW } from '@/data/previewReview'
 
@@ -72,7 +72,7 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
           {/* the card is an inline-size container, so its wrapper needs a
               definite width — it can no longer size from the card's contents */}
           <div className="relative w-full max-w-[400px] origin-top rotate-[-2deg] transition-transform duration-500 hover:rotate-0">
-            <ReviewCard review={PREVIEW_REVIEW} />
+            <ResultCard review={PREVIEW_REVIEW} />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 rounded-b-[20px] bg-gradient-to-t from-ink via-ink/75 to-transparent" />
           </div>
           <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-ink-line bg-ink-soft px-4 py-1.5 font-mono text-[11px] text-cream/50">

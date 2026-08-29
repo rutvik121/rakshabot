@@ -1,8 +1,9 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import { buildUserPrompt, SYSTEM_PROMPT } from './_lib/prompt'
-import { REVIEW_JSON_SCHEMA, validateGeneratedReview } from './_lib/schema'
-import { buildFallbackReview } from './_lib/fallback'
-import type { GeneratedReview, ReviewInput } from './_lib/types'
+import { buildStyledUserPrompt, STYLED_SYSTEM_PROMPT } from './_lib/stylePrompt'
+import { STYLED_REVIEW_JSON_SCHEMA, validateStyledReview } from './_lib/styleSchema'
+import { buildStyledFallback } from './_lib/styleFallback'
+import type { StyledReview } from './_lib/styles'
+import type { ReviewInput } from './_lib/types'
 
 /**
  * Server-side review generation.
@@ -46,7 +47,7 @@ const DEV_FALLBACK_ENABLED = process.env.ALLOW_DEV_FALLBACK === 'true'
 export type ReviewSource = 'ai' | 'dev-fallback'
 
 export interface GenerateReviewResponse {
-  review: GeneratedReview
+  review: StyledReview
   source: ReviewSource
   model: string
 }
@@ -181,13 +182,13 @@ function generate(ai: GoogleGenAI, contents: string, signal: AbortSignal, withTh
     model: MODEL,
     contents,
     config: {
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: STYLED_SYSTEM_PROMPT,
       // Comedy needs room to vary — the same answers should not produce
       // identical wording twice.
       temperature: 1.0,
       ...(withThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
       responseMimeType: 'application/json',
-      responseJsonSchema: REVIEW_JSON_SCHEMA,
+      responseJsonSchema: STYLED_REVIEW_JSON_SCHEMA,
       abortSignal: signal,
     },
   })
@@ -255,7 +256,7 @@ async function callGeminiWithTimeout(
  * poster. When the first attempt violates those, the model is told exactly what
  * was wrong and asked again; a second failure is a real error, not a fallback.
  */
-export async function generateReviewWithGemini(input: ReviewInput): Promise<GeneratedReview> {
+export async function generateReviewWithGemini(input: ReviewInput): Promise<StyledReview> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new GenerateReviewError(
@@ -267,7 +268,7 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Gene
 
   const ai = new GoogleGenAI({ apiKey })
   const deadline = Date.now() + TOTAL_TIMEOUT_MS
-  let contents = buildUserPrompt(input)
+  let contents = buildStyledUserPrompt(input)
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const text = await callGeminiWithTimeout(ai, contents, deadline)
@@ -283,10 +284,10 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Gene
       continue
     }
 
-    const review = validateGeneratedReview(parsed)
+    const review = validateStyledReview(parsed)
     if (review) {
       // The model is told to echo the name; make certain it is theirs.
-      return { ...review, employeeName: input.siblingName.slice(0, 22) }
+      return { ...review, subjectName: input.siblingName.slice(0, 22) }
     }
 
     if (attempt === 2) {
@@ -298,7 +299,7 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Gene
     }
     contents = correctionPrompt(
       text,
-      'the JSON did not satisfy the schema — check that metrics has exactly 5 entries, every score is an integer 0-100, and no required field is missing or empty',
+      'the JSON did not satisfy the schema — check that `content` holds exactly the fields for the style you chose, that every list has the required number of entries, that scores are integers 0-100, and that no required field is missing or empty',
     )
   }
 
@@ -330,7 +331,7 @@ export async function handleGenerateReview(body: unknown): Promise<GenerateRevie
         '[generate-review] ALLOW_DEV_FALLBACK is on — returning a LOCAL, NON-AI review',
       )
       return {
-        review: buildFallbackReview(input, Date.now()),
+        review: buildStyledFallback(input, Date.now()),
         source: 'dev-fallback',
         model: 'local-fallback',
       }

@@ -24,7 +24,7 @@ const measure = (el) => {
 
 for (const style of [...STYLES, 'stress']) {
   const p = await ctx.newPage()
-  await p.goto(`http://localhost:5220/?preview=${style}&width=1080`, { waitUntil: 'networkidle' })
+  await p.goto(`http://localhost:5222/?preview=${style}&width=1080`, { waitUntil: 'networkidle' })
   await p.waitForTimeout(350)
   const card = p.locator('article').first()
   await card.screenshot({ path: `${process.env.OUT}/${style}.png` })
@@ -37,7 +37,7 @@ for (const style of [...STYLES, 'stress']) {
 }
 
 const g = await ctx.newPage()
-await g.goto('http://localhost:5220/?preview=all', { waitUntil: 'networkidle' })
+await g.goto('http://localhost:5222/?preview=all', { waitUntil: 'networkidle' })
 await g.waitForTimeout(500)
 await g.screenshot({ path: `${process.env.OUT}/gallery.png`, fullPage: true })
 await browser.close()

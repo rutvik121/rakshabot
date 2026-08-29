@@ -1,4 +1,4 @@
-import { clamp } from './schema'
+import { clamp } from './clamp'
 import {
   OUTPUT_STYLES,
   RARITIES,
