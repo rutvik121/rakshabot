@@ -9,12 +9,17 @@
     "survives that; one that imports across directories does not, and fails at",
     "runtime as an opaque 500 with no body.",
     "",
-    "This file is what the function build should have been using all along."
+    "This file is what the function build should have been using all along.",
+    "",
+    "NodeNext is deliberate: it is what the platform actually runs, and it makes",
+    "the compiler reject the extensionless relative imports that Node's ESM",
+    "resolver cannot follow. That exact mistake took down the generation route",
+    "with an unreadable 500 — the compiler now catches it instead."
   ],
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
     "types": ["node"],
     "strict": true,

@@ -1,4 +1,4 @@
-import { clamp } from './clamp'
+import { clamp } from './clamp.js'
 import {
   OUTPUT_STYLES,
   RARITIES,
@@ -11,7 +11,7 @@ import {
   type RiskLevel,
   type StyledReview,
   type TrendDirection,
-} from './styles'
+} from './styles.js'
 
 /**
  * Length and count limits for every style.

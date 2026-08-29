@@ -1,6 +1,6 @@
-import { QUESTIONS } from './questions'
-import { COUNTS, LIMITS } from './styleSchema'
-import type { ReviewInput } from './types'
+import { QUESTIONS } from './questions.js'
+import { COUNTS, LIMITS } from './styleSchema.js'
+import type { ReviewInput } from './types.js'
 
 /**
  * The instruction that turns five answers into a chosen universe.

@@ -127,9 +127,12 @@ a platform kill is an opaque 504 with no body for the UI to read. The route's ow
 deadline sits below that ceiling so a slow model comes back as a friendly,
 retryable error instead.
 
-Modules reachable from `api/` import each other **relatively**, never through the
-`@/` alias. Vite resolves the alias; the function bundler does not, and would ship
-`@/data/mockData` as an unresolved import that fails at runtime on every request.
+Everything the function imports lives under `api/`, and every relative import
+carries an explicit `.js` extension. The platform transpiles each file rather
+than bundling it, and Node's ESM resolver does not guess extensions — an
+extensionless import resolves in Vite and in every local test, then fails at
+runtime as a 500 with no body. `api/tsconfig.json` uses `NodeNext`, so the
+compiler rejects that mistake rather than letting it reach production.
 
 Set `GEMINI_API_KEY` in the Vercel project's environment variables. **Not**
 `VITE_GEMINI_API_KEY` — anything `VITE_`-prefixed is inlined into the browser

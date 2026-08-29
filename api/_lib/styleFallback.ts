@@ -1,8 +1,8 @@
-import { clamp } from './clamp'
-import { COUNTS, LIMITS } from './styleSchema'
-import { TRAITS } from './traits'
-import type { OutputStyle, StyledReview } from './styles'
-import type { ReviewInput } from './types'
+import { clamp } from './clamp.js'
+import { COUNTS, LIMITS } from './styleSchema.js'
+import { TRAITS } from './traits.js'
+import type { OutputStyle, StyledReview } from './styles.js'
+import type { ReviewInput } from './types.js'
 
 /**
  * A styled artifact built without a model.

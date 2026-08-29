@@ -1,4 +1,4 @@
-import type { Question } from '../../src/types'
+import type { Question } from '../../src/types.js'
 
 /*
  * The question set lives here rather than under src/ because the serverless

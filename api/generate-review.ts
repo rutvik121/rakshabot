@@ -1,6 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import type { StyledReview } from './_lib/styles'
-import type { ReviewInput } from './_lib/types'
+import type { StyledReview } from './_lib/styles.js'
+import type { ReviewInput } from './_lib/types.js'
 
 /**
  * The prompt, schema and offline generator, loaded on first use.
@@ -14,19 +14,19 @@ import type { ReviewInput } from './_lib/types'
  * Memoised, so the cost is paid once per warm instance rather than per request.
  */
 let modules: Promise<{
-  buildStyledUserPrompt: typeof import('./_lib/stylePrompt').buildStyledUserPrompt
+  buildStyledUserPrompt: typeof import('./_lib/stylePrompt.js').buildStyledUserPrompt
   STYLED_SYSTEM_PROMPT: string
-  STYLED_REVIEW_JSON_SCHEMA: typeof import('./_lib/styleSchema').STYLED_REVIEW_JSON_SCHEMA
-  validateStyledReview: typeof import('./_lib/styleSchema').validateStyledReview
-  buildStyledFallback: typeof import('./_lib/styleFallback').buildStyledFallback
+  STYLED_REVIEW_JSON_SCHEMA: typeof import('./_lib/styleSchema.js').STYLED_REVIEW_JSON_SCHEMA
+  validateStyledReview: typeof import('./_lib/styleSchema.js').validateStyledReview
+  buildStyledFallback: typeof import('./_lib/styleFallback.js').buildStyledFallback
 }> | null = null
 
 function load() {
   modules ??= (async () => {
     const [prompt, schema, fallback] = await Promise.all([
-      import('./_lib/stylePrompt'),
-      import('./_lib/styleSchema'),
-      import('./_lib/styleFallback'),
+      import('./_lib/stylePrompt.js'),
+      import('./_lib/styleSchema.js'),
+      import('./_lib/styleFallback.js'),
     ])
     return {
       buildStyledUserPrompt: prompt.buildStyledUserPrompt,

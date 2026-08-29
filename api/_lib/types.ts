@@ -1,4 +1,4 @@
-import type { StyledReview } from './styles'
+import type { StyledReview } from './styles.js'
 
 /** What the user told us, as collected by the question flow. */
 export interface ReviewInput {
