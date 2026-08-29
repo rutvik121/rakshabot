@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { describeKey, normaliseKey } from './_lib/apiKey.js'
 
 /**
  * Configuration check for the deployed generation route.
@@ -15,27 +16,6 @@ import { GoogleGenAI } from '@google/genai'
 
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash'
 
-interface KeyReport {
-  configured: boolean
-  length?: number
-  /** Paste damage that makes a valid key fail: quotes, spaces, a newline. */
-  problems?: string[]
-}
-
-function inspectKey(raw: string | undefined): KeyReport {
-  if (!raw) return { configured: false }
-
-  const problems: string[] = []
-  if (raw !== raw.trim()) problems.push('has leading or trailing whitespace')
-  const trimmed = raw.trim()
-  if (/^["']|["']$/.test(trimmed)) problems.push('is wrapped in quotes — paste the key without them')
-  if (/\s/.test(trimmed)) problems.push('contains a space or newline')
-  if (trimmed.startsWith('AIza') === false) problems.push('does not start with "AIza", which Google keys do')
-  if (trimmed.length < 30) problems.push('looks too short to be a full key')
-
-  return { configured: true, length: raw.length, ...(problems.length ? { problems } : {}) }
-}
-
 /** Maps an upstream failure to a cause, without echoing Google's error body. */
 function diagnose(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
@@ -48,7 +28,7 @@ function diagnose(error: unknown): string {
 }
 
 export async function checkHealth(live: boolean) {
-  const key = inspectKey(process.env.GEMINI_API_KEY)
+  const key = describeKey(process.env.GEMINI_API_KEY)
 
   const report: Record<string, unknown> = {
     route: 'ok',
@@ -85,7 +65,7 @@ export async function checkHealth(live: boolean) {
 
   // One deliberately tiny call: enough to prove the key and model work.
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    const ai = new GoogleGenAI({ apiKey: normaliseKey(process.env.GEMINI_API_KEY) })
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 20_000)
     try {
