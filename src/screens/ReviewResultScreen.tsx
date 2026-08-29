@@ -41,7 +41,7 @@ export function ReviewResultScreen({ review, source = 'ai', onRestart }: ReviewR
         </p>
       </header>
 
-      <div className="relative z-10 mt-8 flex w-full justify-center">
+      <div className="relative z-10 mt-8 flex w-full justify-center [&>*]:w-full [&>*]:max-w-[400px]">
         <ReviewCard review={review} />
       </div>
 

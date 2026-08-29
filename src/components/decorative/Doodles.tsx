@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react'
+import type { CSSProperties, SVGProps } from 'react'
 
 export function StarDoodle(props: SVGProps<SVGSVGElement>) {
   return (
@@ -56,10 +56,16 @@ export function TapePiece({
   )
 }
 
-export function Barcode({ className = '' }: { className?: string }) {
+export function Barcode({
+  className = '',
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
   const bars = [2, 1, 3, 1, 1, 2, 1, 4, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 1, 2, 1, 4, 1]
   return (
-    <div className={`flex items-stretch gap-[2px] ${className}`}>
+    <div className={`flex items-stretch gap-[2px] ${className}`} style={style}>
       {bars.map((w, i) => (
         <div key={i} style={{ width: w }} className="bg-current" />
       ))}
@@ -95,12 +101,20 @@ export function CropMark({ className = '' }: { className?: string }) {
   )
 }
 
-export function SparkleRow({ className = '' }: { className?: string }) {
+export function SparkleRow({
+  className = '',
+  style,
+}: {
+  className?: string
+  style?: CSSProperties
+}) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <StarDoodle className="h-3 w-3 text-orange" />
-      <StarDoodle className="h-2 w-2 text-pink" />
-      <StarDoodle className="h-4 w-4 text-hotpink" />
+    <div className={`flex items-center justify-center gap-2 ${className}`} style={style}>
+      {/* Inherits `currentColor` when a colour is passed, so a caller can tint
+          the whole row without the brand palette leaking into every card. */}
+      <StarDoodle className={`h-3 w-3 ${style?.color ? '' : 'text-orange'}`} />
+      <StarDoodle className={`h-2 w-2 ${style?.color ? '' : 'text-pink'}`} />
+      <StarDoodle className={`h-4 w-4 ${style?.color ? '' : 'text-hotpink'}`} />
     </div>
   )
 }

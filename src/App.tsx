@@ -4,6 +4,7 @@ import { QuestionFlowScreen } from '@/screens/QuestionFlowScreen'
 import { GenerationScreen } from '@/screens/GenerationScreen'
 import { ReviewResultScreen } from '@/screens/ReviewResultScreen'
 import { generateReview, toReviewData, type ReviewResult, type ReviewSource } from '@/lib/review'
+import { TemplateGallery } from '@/dev/TemplateGallery'
 import type { Answers, ReviewData, SiblingIdentity } from '@/types'
 
 type Stage = 'landing' | 'questions' | 'generating' | 'result'
@@ -13,7 +14,26 @@ interface Submission {
   answers: Answers
 }
 
+/*
+ * Development-only template gallery. The output templates are a fixed-canvas
+ * design problem best judged side by side at export width, so `?preview=all`
+ * (or a single style, or `stress`) renders them directly. The flag is a
+ * compile-time constant, so this branch and the gallery are eliminated from a
+ * production build.
+ */
+function devPreview(): string | null {
+  if (!import.meta.env.DEV) return null
+  return new URLSearchParams(window.location.search).get('preview')
+}
+
 function App() {
+  const preview = devPreview()
+  // A wrapper, so the flow's hooks are never behind a condition.
+  return preview ? <TemplateGallery which={preview} /> : <ReviewFlow />
+}
+
+function ReviewFlow() {
+
   const [stage, setStage] = useState<Stage>('landing')
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [review, setReview] = useState<ReviewData | null>(null)
