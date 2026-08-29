@@ -238,7 +238,33 @@ function correctionPrompt(previous: string, problem: string): string {
  * Not every model accepts the setting, so one that rejects it is retried
  * without it and remembered, rather than failing every request from then on.
  */
-let thinkingLevelSupported = true
+/**
+ * Request features, in the order they are given up.
+ *
+ * Every one of these is an optimisation, not a requirement. `thinkingConfig`
+ * buys latency, `responseJsonSchema` and JSON mode buy a cleaner first draft —
+ * but the prompt already spells the schema out in full, and the response is
+ * validated and retried server-side regardless. So when the API refuses a
+ * feature, the right move is to drop it and keep going rather than fail the
+ * request.
+ *
+ * Which features an API version and model accept varies, and a rejection
+ * arrives as an opaque `400 INVALID_ARGUMENT` that does not always name the
+ * offending field. Rather than guess, the call walks down this ladder until
+ * something is accepted, then remembers where it landed for the rest of the
+ * instance's life.
+ */
+const LADDER = [
+  { thinking: true, schema: true, jsonMime: true },
+  { thinking: false, schema: true, jsonMime: true },
+  { thinking: false, schema: false, jsonMime: true },
+  { thinking: false, schema: false, jsonMime: false },
+] as const
+
+type Features = (typeof LADDER)[number]
+
+/** Where the last successful call landed, so later requests start there. */
+let rung = 0
 
 interface PromptParts {
   STYLED_SYSTEM_PROMPT: string
@@ -249,7 +275,7 @@ function generate(
   ai: GoogleGenAI,
   contents: string,
   signal: AbortSignal,
-  withThinking: boolean,
+  features: Features,
   parts: PromptParts,
 ) {
   return ai.models.generateContent({
@@ -260,12 +286,58 @@ function generate(
       // Comedy needs room to vary — the same answers should not produce
       // identical wording twice.
       temperature: 1.0,
-      ...(withThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
-      responseMimeType: 'application/json',
-      responseJsonSchema: parts.STYLED_REVIEW_JSON_SCHEMA,
+      ...(features.thinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+      ...(features.jsonMime ? { responseMimeType: 'application/json' } : {}),
+      ...(features.schema ? { responseJsonSchema: parts.STYLED_REVIEW_JSON_SCHEMA } : {}),
       abortSignal: signal,
     },
   })
+}
+
+/** A refusal of the request's shape, as opposed to a real failure. */
+function isFeatureRejection(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error)
+  if (/abort/i.test(raw)) return false
+  return (
+    /INVALID_ARGUMENT|\b400\b/.test(raw) ||
+    /unknown name|not supported|unsupported|is not enabled|unexpected/i.test(raw)
+  )
+}
+
+/**
+ * Runs `attempt` with the richest feature set the model has accepted so far,
+ * dropping features and retrying while it keeps refusing the request's shape.
+ *
+ * Only shape refusals walk the ladder. A rate limit, a bad key or a timeout is
+ * a real failure and is raised immediately — degrading on those would turn one
+ * clear error into four slow ones.
+ */
+export async function withSupportedFeatures<T>(
+  attempt: (features: Features) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown
+
+  for (let step = rung; step < LADDER.length; step++) {
+    try {
+      const result = await attempt(LADDER[step])
+      if (step !== rung) {
+        console.warn(
+          `[generate-review] request shape refused; settled on ${JSON.stringify(LADDER[step])}`,
+        )
+        rung = step
+      }
+      return result
+    } catch (error) {
+      lastError = error
+      if (!isFeatureRejection(error)) throw error
+    }
+  }
+  throw lastError
+}
+
+/** Test seam: forget which rung worked, so cases do not leak into each other. */
+export function resetFeatureMemory(): void {
+  rung = 0
 }
 
 async function callGemini(
@@ -276,18 +348,11 @@ async function callGemini(
 ): Promise<string> {
   let response
   try {
-    response = await generate(ai, contents, signal, thinkingLevelSupported, parts)
+    response = await withSupportedFeatures((features) =>
+      generate(ai, contents, signal, features, parts),
+    )
   } catch (error) {
-    const raw = error instanceof Error ? error.message : String(error)
-    if (!thinkingLevelSupported || !/thinking/i.test(raw)) throw fromProviderError(error)
-
-    console.warn(`[generate-review] "${MODEL}" rejected thinkingLevel — retrying without it`)
-    thinkingLevelSupported = false
-    try {
-      response = await generate(ai, contents, signal, false, parts)
-    } catch (retryError) {
-      throw fromProviderError(retryError)
-    }
+    throw fromProviderError(error)
   }
 
   const text = response.text
@@ -321,6 +386,25 @@ async function callGeminiWithTimeout(
     return await callGemini(ai, contents, controller.signal, parts)
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+/**
+ * Reads JSON out of a model response.
+ *
+ * With JSON mode on, the body is already JSON. Once the ladder has had to drop
+ * it, the model tends to wrap the object in a markdown fence or introduce it
+ * with a sentence, so the object is extracted rather than assumed.
+ */
+export function parseJson(text: string): unknown {
+  const trimmed = text.trim()
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    // Fenced block first, then the outermost braces.
+    const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed)?.[1]
+    const candidate = fenced ?? trimmed.slice(trimmed.indexOf('{'), trimmed.lastIndexOf('}') + 1)
+    return JSON.parse(candidate)
   }
 }
 
@@ -371,7 +455,7 @@ export async function generateReviewWithGemini(input: ReviewInput): Promise<Styl
 
     let parsed: unknown
     try {
-      parsed = JSON.parse(text)
+      parsed = parseJson(text)
     } catch {
       if (attempt === 2) {
         throw new GenerateReviewError('Model returned unparseable JSON', 502, 'invalid_json')
