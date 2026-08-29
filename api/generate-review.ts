@@ -190,6 +190,25 @@ function fromProviderError(error: unknown): GenerateReviewError {
       'invalid_api_key',
     )
   }
+  /*
+   * A 401 here is not a wrong key — it is Google declining to treat the key as
+   * a key at all. Keys issued with the `AQ.` prefix are currently rejected by
+   * generativelanguage.googleapis.com however they are sent, which is a
+   * Google-side issue rather than anything the request can fix. Saying so
+   * stops it reading as an application bug.
+   */
+  if (/UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|\b401\b/.test(raw)) {
+    const looksNewFormat = normaliseKey(process.env.GEMINI_API_KEY).startsWith('AQ.')
+    return new GenerateReviewError(
+      looksNewFormat
+        ? 'Google rejected this key. Keys beginning "AQ." are currently not accepted by the ' +
+          'Gemini API — a known Google-side issue. An "AIza" key works; try creating one in ' +
+          'Google Cloud Console (APIs & Services → Credentials) or under a different Google account.'
+        : `Google rejected the credentials. ${upstreamDetail(raw)}`,
+      503,
+      'invalid_api_key',
+    )
+  }
   if (/PERMISSION_DENIED|403/.test(raw)) {
     return new GenerateReviewError(
       'The API key lacks access to this model',

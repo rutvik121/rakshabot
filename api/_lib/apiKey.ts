@@ -68,6 +68,19 @@ export function describeKey(raw: string | undefined): KeyReport {
     )
   }
 
+  /*
+   * Shape-valid but currently unusable: AI Studio has begun issuing `AQ.` keys
+   * that generativelanguage.googleapis.com rejects with 401 however they are
+   * sent. Worth flagging up front, since the request will fail and the cause
+   * is not in this codebase.
+   */
+  if (key.startsWith('AQ.')) {
+    problems.push(
+      'is an "AQ." key, which the Gemini API is currently rejecting with 401 — a known ' +
+        'Google-side issue. An "AIza" key works',
+    )
+  }
+
   // Paste damage is worth reporting even when the key is otherwise the right
   // shape — it is invisible in a dashboard field and breaks the request header.
   if (raw !== raw.trim()) problems.push('has leading or trailing whitespace')
