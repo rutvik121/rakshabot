@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:profiles": "tsx scripts/test-profiles.ts"
+    "test:profiles": "tsx scripts/test-profiles.ts",
+    "test:visual": "node scripts/test-visual.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
@@ -22,6 +24,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
+    "playwright": "^1.58.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "~6.0.2",

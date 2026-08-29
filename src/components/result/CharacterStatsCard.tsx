@@ -80,7 +80,7 @@ export function CharacterStatsCard({
         style={{ background: `radial-gradient(circle, ${VIOLET}, transparent 70%)` }}
       />
 
-      <div className="relative z-10 flex flex-1 flex-col gap-[1.8cqw] px-[5cqw] pt-[4.5cqw]">
+      <div className="relative z-10 flex flex-1 flex-col gap-[1.6cqw] px-[5cqw] pt-[4.2cqw]">
         <header className="flex items-start justify-between gap-[2cqw]">
           <h1 className="font-display text-[6.2cqw] font-extrabold uppercase leading-[0.9] tracking-tight">
             Character
@@ -98,7 +98,7 @@ export function CharacterStatsCard({
         {/* portrait + attributes */}
         <section className="flex items-stretch gap-[2.2cqw]">
           <div
-            className="h-[26cqw] w-[24cqw] shrink-0 overflow-hidden"
+            className="h-[25cqw] w-[24cqw] shrink-0 overflow-hidden"
             style={{
               background: 'rgba(168,119,255,0.12)',
               border: `1px solid ${VIOLET}66`,
@@ -166,7 +166,7 @@ export function CharacterStatsCard({
 
         {/* party status */}
         <section
-          className="mt-auto mb-[0.6cqw] px-[3cqw] py-[2cqw] text-center"
+          className="mt-auto mb-[0.4cqw] px-[3cqw] py-[1.8cqw] text-center"
           style={{
             background: 'linear-gradient(180deg, rgba(255,79,163,0.16), rgba(168,119,255,0.08))',
             border: `1px solid ${PINK}66`,

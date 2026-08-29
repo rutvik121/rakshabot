@@ -138,9 +138,19 @@ bundle. Leave `ALLOW_DEV_FALLBACK` unset in production.
 ### Testing
 
 ```bash
+npm run typecheck              # tsc -b --noEmit — the root tsconfig is a
+                               # solution file, so `tsc -p` checks nothing
 npm run test:profiles          # offline generator, no key needed
 npm run test:profiles -- --api # the real Gemini pipeline (needs a key + dev server)
+npm run test:visual            # layout regressions, boots its own dev server
 ```
+
+`test:visual` covers the two bugs typechecking cannot see: copy overrunning the
+fixed canvas, and the on-screen keyboard covering the field being typed into.
+The second only reproduces when the page lays out tall and the *visual*
+viewport shrinks afterwards — what a phone does, and what resizing a browser
+window does not — so it fakes `visualViewport` rather than the window. Needs
+`npx playwright install chromium` once.
 
 Both assert that six very different siblings land in different universes and
 produce different content, that every card reuses at least three of the user's

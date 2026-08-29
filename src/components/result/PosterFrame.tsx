@@ -44,7 +44,13 @@ export function PosterFrame({
       className={`@container relative isolate flex aspect-[1080/1350] w-full flex-col overflow-hidden rounded-[3cqw] shadow-card ${className}`}
       style={{ background, color: ink, border: `1px solid ${border}`, ...style }}
     >
-      {children}
+      {/*
+        The interior is allowed to shrink and clip, never to grow the card. Model
+        copy varies more than any layout can absorb, and without this a card that
+        runs a few pixels tall pushes the signature strip off the canvas — which
+        is a broken export rather than a slightly cramped one.
+      */}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
 
       <footer
         className="relative z-10 mt-auto flex items-end justify-between gap-[3cqw] px-[5cqw] pb-[4cqw] pt-[1.8cqw]"
