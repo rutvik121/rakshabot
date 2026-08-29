@@ -96,20 +96,36 @@ client-side fix, and some accounts can no longer obtain an `AIza` key at all
 the way out. Set `GOOGLE_SERVICE_ACCOUNT_KEY` and the app switches backends —
 no code change, and `GEMINI_API_KEY` is then ignored.
 
+```bash
+npm run setup:vertex
+```
+
+That script does the whole setup: creates the project, enables the Vertex AI
+API, creates a service account with the one role it needs, issues a key, and
+writes it into `.env.local`. It needs the
+[gcloud CLI](https://cloud.google.com/sdk/docs/install) and `gcloud auth login`;
+every step is skipped if already done, so re-running is safe. It also drops the
+two values for Vercel into `vertex-key-for-vercel.txt` (gitignored) — paste them
+into **Settings → Environment Variables**, redeploy, delete the file.
+
+<details>
+<summary>Doing it by hand instead</summary>
+
 1. In the [Google Cloud Console](https://console.cloud.google.com), pick or
-   create a project and note its **project id**.
+   create a project (billing enabled) and note its **project id**.
 2. **APIs & Services → Enable APIs** → enable **Vertex AI API**.
 3. **IAM & Admin → Service Accounts → Create service account**. Give it the
    **Vertex AI User** role.
 4. On that service account: **Keys → Add key → Create new key → JSON**. A file
    downloads.
-5. Set `GOOGLE_SERVICE_ACCOUNT_KEY` to the entire contents of that file (one
-   line is fine; base64 also works if the dashboard mangles it), and
+5. Set `GOOGLE_SERVICE_ACCOUNT_KEY` to the entire contents of that file, and
    `GOOGLE_CLOUD_PROJECT` to the project id if the key does not carry one.
-   Locally that is `.env.local`; on Vercel it is **Settings → Environment
-   Variables**, then redeploy.
-6. Confirm with `/api/health?live=1` — it should report
-   `backend.kind: "vertex"` and `gemini.reachable: true`.
+   Base64 is safer than raw JSON in a dashboard field, and is accepted — quotes
+   and newlines are what get mangled.
+</details>
+
+Either way, confirm with `/api/health?live=1`: it should report
+`backend.kind: "vertex"` and `gemini.reachable: true`.
 
 `GOOGLE_CLOUD_LOCATION` defaults to `global`, which is where Vertex serves the
 newest models; set a region only if you need one. Vertex AI is billed per
@@ -191,6 +207,7 @@ running functions.
 ### Testing
 
 ```bash
+npm run setup:vertex           # one-command Vertex AI setup (needs gcloud)
 npm run typecheck              # tsc -b --noEmit — the root tsconfig is a
                                # solution file, so `tsc -p` checks nothing
 npm run test:profiles          # offline generator, no key needed

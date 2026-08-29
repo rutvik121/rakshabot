@@ -30,3 +30,6 @@ dist-ssr
 
 # Vercel CLI project link
 .vercel
+
+# Service-account key emitted by scripts/setup-vertex.sh — never commit
+vertex-key-for-vercel.txt

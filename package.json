@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "setup:vertex": "bash scripts/setup-vertex.sh",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",

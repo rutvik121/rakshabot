@@ -265,8 +265,9 @@ function fromProviderError(error: unknown, backend: BackendKind): GenerateReview
   }
   if (backend === 'vertex' && /invalid_grant|invalid_client|JWT/i.test(raw)) {
     return new GenerateReviewError(
-      'Google would not exchange the service account for a token. The key may have been deleted ' +
-        `or disabled, or the service account removed from the project. ${upstreamDetail(raw)}`,
+      'Google signed the request but would not issue a token for this service account. Either it ' +
+        'no longer exists (deleted, or its key revoked), or GOOGLE_CLOUD_PROJECT names a different ' +
+        `project to the one the key was created in. ${upstreamDetail(raw)}`,
       503,
       'invalid_service_account',
     )
