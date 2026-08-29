@@ -326,7 +326,7 @@ function readApiKey(): string {
   }
   if (!isUsableKey(raw)) {
     throw new GenerateReviewError(
-      `GEMINI_API_KEY ${report.problems?.[0] ?? 'is not a Google AI Studio key'}. ` +
+      `GEMINI_API_KEY ${report.problems?.[0] ?? 'does not look like a Gemini API key'}. ` +
         'Get one at aistudio.google.com/apikey and set it in the deployment environment.',
       503,
       'invalid_api_key',

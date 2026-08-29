@@ -65,6 +65,15 @@ for the dev API route. Vite itself only exposes `VITE_`-prefixed variables, and
 only to the client, so without that step the key would be invisible to the
 server. In production the host provides these directly.
 
+AI Studio issues keys starting `AQ.`; older keys start `AIza`. Both are
+accepted. The route checks the key's shape before making a request, because a
+credential of the wrong kind does not get cleanly rejected — it hangs until the
+deadline and reports a timeout, which blames the model for something the key
+did. Wrong credentials are named rather than merely refused (an OAuth token, a
+service-account JSON, a project id), and paste damage is reported even on a
+valid key, since a trailing newline is invisible in a dashboard field and breaks
+the request header.
+
 If the key is wrong or lacks access, the route says so specifically
 (`invalid_api_key`, `permission_denied`, `model_not_found`, `rate_limited`)
 rather than failing generically.

@@ -2,33 +2,36 @@
  * Reading the Gemini API key, and naming what was supplied instead.
  *
  * Google hands out several credentials that look plausible in an environment
- * variable and none of which the Gemini API accepts. Saying only "this is not a
- * key" sends someone back to the same page they got it from; saying "this is an
- * OAuth access token, they expire hourly, you want an AI Studio key" ends the
- * problem in one step.
+ * variable and that the Gemini API does not accept. Saying only "this is not a
+ * key" sends someone back to the same page they got it from; naming what they
+ * actually supplied ends the problem in one step.
+ *
+ * Being wrong in the other direction is worse: a validator that rejects a key
+ * which works is a self-inflicted outage. So the accepted set is deliberately
+ * broad, and only credentials that are unmistakably something else are refused.
  *
  * Nothing here ever returns key material — only its length and its shape.
  */
 
-/** AI Studio keys: `AIza` and roughly 35 more characters. */
-const AI_STUDIO_KEY = /^AIza[\w-]{20,}$/
+/**
+ * The two shapes AI Studio has issued.
+ *
+ * `AQ.` is the current format; `AIza` is the older one, still working but being
+ * retired. Both are accepted, because a key that works today should not be
+ * refused on the grounds of being the wrong vintage.
+ */
+const API_KEY = /^(AQ\.[\w.-]{16,}|AIza[\w-]{20,})$/
 
 /** Credentials people reach for by mistake, and what they actually are. */
 const IMPOSTORS: { test: RegExp; what: string }[] = [
   {
-    test: /^(AQ\.|ya29\.)/,
+    test: /^ya29\./,
     what:
       'a Google OAuth access token, not an API key. Those expire after about an hour and the Gemini API does not accept them',
   },
   { test: /^\s*\{/, what: 'a service-account JSON file, which the Gemini API does not accept' },
-  {
-    test: /^(sk-|sk_)/,
-    what: 'an OpenAI-style key, which will not work against Google',
-  },
-  {
-    test: /^[a-z0-9-]+$/,
-    what: 'a project id rather than a key',
-  },
+  { test: /^(sk-|sk_)/, what: 'an OpenAI-style key, which will not work against Google' },
+  { test: /^[a-z0-9-]+$/, what: 'a project id rather than a key' },
 ]
 
 export interface KeyReport {
@@ -44,7 +47,7 @@ export function normaliseKey(raw: string | undefined): string {
 }
 
 export function isUsableKey(raw: string | undefined): boolean {
-  return AI_STUDIO_KEY.test(normaliseKey(raw))
+  return API_KEY.test(normaliseKey(raw))
 }
 
 /** What is wrong with this value, in the order worth reading. */
@@ -57,10 +60,12 @@ export function describeKey(raw: string | undefined): KeyReport {
   const impostor = IMPOSTORS.find((i) => i.test.test(key))
   if (impostor) {
     problems.push(`looks like ${impostor.what}`)
-  } else if (!key.startsWith('AIza')) {
-    problems.push('does not start with "AIza", which Google AI Studio keys do')
-  } else if (!AI_STUDIO_KEY.test(key)) {
-    problems.push('starts with "AIza" but looks truncated')
+  } else if (!API_KEY.test(key)) {
+    problems.push(
+      /^(AQ\.|AIza)/.test(key)
+        ? 'starts correctly but looks truncated — check the whole key was copied'
+        : 'does not look like a Gemini API key. AI Studio keys start with "AQ." (or "AIza" if older)',
+    )
   }
 
   // Paste damage is worth reporting even when the key is otherwise the right
