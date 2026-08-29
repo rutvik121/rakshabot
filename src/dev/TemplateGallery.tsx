@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { ResultCard } from '@/components/result/ResultCard'
+import { downloadCard } from '@/lib/share/cardImage'
 import { OUTPUT_STYLES, type OutputStyle } from '@/lib/review/styles'
 import { SAMPLE_REVIEWS, STRESS_REVIEW } from '@/data/sampleReviews'
 
@@ -62,12 +64,30 @@ function Slot({
   width: number
   children: React.ReactNode
 }) {
+  const ref = useRef<HTMLDivElement>(null)
   return (
     <div data-template={label} className="flex flex-col gap-3" style={{ width }}>
-      <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-cream/45">
-        {label}
-      </span>
-      {children}
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-cream/45">
+          {label}
+        </span>
+        {/*
+          Exports run the real share path. Rasterising a DOM is where gradient
+          text, clip-path, emoji and web fonts quietly fail, so the only useful
+          check is looking at the file each template actually produces.
+        */}
+        <button
+          data-export={label}
+          onClick={() => {
+            const node = ref.current?.firstElementChild
+            if (node instanceof HTMLElement) void downloadCard(node, label)
+          }}
+          className="rounded-full border border-ink-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-cream/60 hover:text-cream"
+        >
+          Export png
+        </button>
+      </div>
+      <div ref={ref}>{children}</div>
     </div>
   )
 }

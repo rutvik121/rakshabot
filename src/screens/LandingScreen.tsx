@@ -38,24 +38,25 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
       <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center px-6 pb-20 pt-10 text-center sm:pt-16">
         <div className="flex items-center gap-2 rounded-full border border-ink-line bg-ink-soft px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-cream/60">
           <StarDoodle className="h-3 w-3 text-orange" />
-          Raksha Bandhan performance reviews, live now
+          Raksha Bandhan, six ways, live now
         </div>
 
         <h1 className="mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.08] tracking-tight text-cream sm:text-6xl">
-          Every sibling deserves a review.{' '}
+          One sibling.{' '}
           <span className="bg-gradient-to-r from-hotpink via-coral to-orange bg-clip-text text-transparent">
-            Yours, honestly.
+            Many worlds.
           </span>
         </h1>
 
         <p className="mt-5 max-w-lg text-balance text-base leading-relaxed text-cream/60 sm:text-lg">
-          Give your sibling their annual performance review. Roast them a little.
-          Appreciate them a lot.
+          Answer five questions and RakshaBot decides how your sibling should be
+          remembered — a case file, an awards night, a stock report. Roast them a
+          little. Keep them anyway.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-          <Button onClick={onStart} className="w-full sm:w-auto">
-            Review My Sibling <span aria-hidden>→</span>
+          <Button onClick={onStart} className="w-full sm:w-auto" data-start>
+            Find Out Which <span aria-hidden>→</span>
           </Button>
           <span className="flex items-center gap-1.5 text-xs text-cream/40">
             <HeartDoodle className="h-3.5 w-3.5 text-hotpink" />
@@ -63,7 +64,7 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
           </span>
         </div>
 
-        {/* preview of the review card */}
+        {/* one of the six, built by the same generator the product uses */}
         <div className="relative mt-16 flex w-full justify-center">
           <div
             aria-hidden
@@ -76,7 +77,7 @@ export function LandingScreen({ onStart }: LandingScreenProps) {
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 rounded-b-[20px] bg-gradient-to-t from-ink via-ink/75 to-transparent" />
           </div>
           <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-ink-line bg-ink-soft px-4 py-1.5 font-mono text-[11px] text-cream/50">
-            preview · yours will look sharper
+            one of six · yours is chosen from your answers
           </span>
         </div>
       </main>

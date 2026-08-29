@@ -122,7 +122,8 @@ async function checkKeyboard(ctx) {
       }
     })
     await page.goto(BASE, { waitUntil: 'networkidle' })
-    await page.getByRole('button', { name: /review|start|roast/i }).first().click()
+    // Targeted by attribute, not label — the CTA copy is allowed to change.
+    await page.click('[data-start]')
     await page.waitForSelector('#sibling-name')
 
     for (const step of ['name', 'question']) {
